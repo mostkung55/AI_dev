@@ -1,16 +1,32 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
 import './App.css'
 import Side from './layout/Side'
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+
+import Dashboard from './components/Dashboard'
+import ManageIngre from './components/ManageIngre'
+import ManageOrder from './components/ManageOrder'
+import ManageProduct from './components/ManageProduct'
 
 
 function App() {
-  const [count, setCount] = useState(0)
+
 
   return (
     <>
-      <Side />
+      <Router>
+      <div style={{ display: "flex" }}>  {/*  ใช้ flex ทำ Sidebar + Content */}
+        <Side />  {/*  Sidebar อยู่ทางซ้าย */}
+        <div style={{ flex: 1, padding: "20px" }}> {/*  Content ทางขวา */}
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/Product" element={<ManageProduct />} />
+            <Route path="/Ingre" element={<ManageIngre />} />
+            <Route path="/Order" element={<ManageOrder />} />
+          </Routes>
+        </div>
+      </div>
+    </Router>
+        
     </>
   )
 }
