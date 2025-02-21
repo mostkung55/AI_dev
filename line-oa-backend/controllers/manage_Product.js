@@ -1,4 +1,14 @@
 const db = require("../db"); // นำเข้า database connection
+const express = require("express");
+const productController = require('../controllers/manage_Product');
+const app = express();
+const cors = require("cors");
+const multer = require("multer");
+
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
 
 // CREATE: เพิ่มสินค้าใหม่
 exports.createProduct = async (req, res) => {
