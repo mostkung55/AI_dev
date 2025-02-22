@@ -13,15 +13,27 @@ app.use(express.urlencoded({ extended: true }));
 // CREATE: เพิ่มสินค้าใหม่
 exports.createProduct = async (req, res) => {
     try {
-        const { name, price, description, image } = req.body;
-        const sql = "INSERT INTO Product (Product_Name, Price, Description,Product_image) VALUES (?, ?, ?, ?)";
+        if (!req.file) {
+            return res.status(400).json({ message: "กรุณาอัปโหลดไฟล์รูปภาพ" });
+        }
 
-        const [result] = await db.query(sql, [name, price, description, image] );
-        res.status(201).json({ message: 'Product created', productId: result.insertId });
+        const { name, price, description } = req.body;
+        if (!name || !description || !price) {
+            return res.status(400).json({ message: "กรุณากรอกข้อมูลให้ครบถ้วน" });
+        }
+
+        const imagePath = `/uploads/${req.file.filename}`; // ✅ เก็บเส้นทางไฟล์รูป
+
+        const sql = "INSERT INTO Product (Product_Name, Price, Description, Product_image) VALUES (?, ?, ?, ?)";
+        const [result] = await db.query(sql, [name, price, description, imagePath]);
+
+        res.status(201).json({ message: "เพิ่มสินค้าสำเร็จ!", productId: result.insertId });
     } catch (error) {
-        console.log(error)
+        console.error("🚨 เพิ่มสินค้าไม่สำเร็จ:", error);
+        res.status(500).json({ message: "เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์" });
     }
 };
+
 
 // READ: ดึงข้อมูลสินค้าทั้งหมด
 exports.getAllProducts = async (req, res) => {
@@ -55,21 +67,37 @@ exports.getProductById = async (req, res) => {
 exports.updateProduct = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, price, description, image } = req.body;
+        const { name, price, description } = req.body;
+
+        // 🔹 ดึงค่ารูปภาพปัจจุบันจากฐานข้อมูลก่อน
+        const [existingProduct] = await db.query("SELECT Product_image FROM Product WHERE Product_ID = ?", [id]);
+
+        if (existingProduct.length === 0) {
+            return res.status(404).json({ message: "ไม่พบสินค้า" });
+        }
+
+        let imagePath = existingProduct[0].Product_image; // ใช้ค่ารูปเดิมถ้าไม่ได้อัปโหลดใหม่
+
+        if (req.file) {
+            imagePath = `/uploads/${req.file.filename}`; // ✅ ใช้รูปใหม่ถ้ามีการอัปโหลด
+        }
+
         const sql = "UPDATE Product SET Product_Name = ?, Price = ?, Description = ?, Product_image = ? WHERE Product_ID = ?";
-    
-        const [product] = await db.query(sql, [name, price, description, image, id])
+        const [product] = await db.query(sql, [name, price, description, imagePath, id]);
 
         if (product.affectedRows === 0) {
-            return res.status(404).json({ message: "Product not found" });
+            return res.status(404).json({ message: "ไม่พบสินค้า" });
         }
-        res.status(200).json({ message: "Product updated successfully" });
+
+        res.status(200).json({ message: "อัปเดตสินค้าสำเร็จ!", imagePath });
 
     } catch (error) {
-        console.log(error)
+        console.error("🚨 อัปเดตสินค้าไม่สำเร็จ:", error);
+        res.status(500).json({ message: "เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์" });
     }
- 
 };
+
+
 
 // DELETE: ลบสินค้า
 exports.deleteProduct = async (req, res) => {

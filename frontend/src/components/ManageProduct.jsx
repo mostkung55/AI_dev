@@ -47,83 +47,90 @@ const ManageProduct = () => {
         .then((res) => setData(res.data))
         .catch((err) => console.log(err)) 
   }
-//Image Size 413 
+
   const handleImageUpload = (event) => {
     const file = event.target.files[0];
+
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImage(reader.result);
-      };
-      reader.readAsDataURL(file);
+        if (file.size > 50 * 1024 * 1024) { // ตรวจสอบขนาดไฟล์
+            alert("ไฟล์ใหญ่เกินไป! กรุณาอัปโหลดไฟล์ที่มีขนาดต่ำกว่า 50MB");
+            return;
+        }
+        setImage(file); // เก็บไฟล์ไว้ใน state
     }
-  };
-  const handleEditProduct = async () => {
-    if (!Product_Name || !Description || !Price || !Product_image) {
+};
+
+const handleEditProduct = async () => {
+  if (!Product_Name || !Description || !Price) {
       alert("Please fill in all fields!");
       return;
-    }
-  
-    const updatedProduct = {
-      name: Product_Name,
-      description: Description,
-      price: Price,
-      image: Product_image,
-    };
-  
-    try {
-      await axios.put(`http://localhost:3000/api/products/${editId}`, updatedProduct);
-      console.log("✅ อัปเดตสินค้าสำเร็จ!");
-      
-      // ✅ โหลดข้อมูลใหม่หลังจากอัปเดต
-      loadData();
-      
-      // ✅ เคลียร์ค่าในฟอร์ม
+  }
+
+  const formData = new FormData();
+  formData.append("name", Product_Name);
+  formData.append("description", Description);
+  formData.append("price", Price);
+
+  // ✅ ถ้ามีการอัปโหลดไฟล์ใหม่ให้เพิ่มเข้าไป
+  if (Product_image instanceof File) {
+      formData.append("Product_image", Product_image); // ✅ ส่งไฟล์ไปกับ FormData
+  }
+
+  try {
+      const response = await axios.put(`http://localhost:3000/api/products/${editId}`, formData, {
+          headers: { "Content-Type": "multipart/form-data" }
+      });
+
+      console.log("✅ อัปเดตสินค้าสำเร็จ!", response.data);
+
+      loadData(); // โหลดข้อมูลใหม่
+
+      // ✅ ล้างค่าในฟอร์ม
       setProductName("");
       setDescription("");
       setPrice("");
       setImage(null);
       setEditId(null);
-      
-      // ✅ ปิด Modal
       setOpenEdit(false);
-    } catch (error) {
+  } catch (error) {
       console.error("❌ อัปเดตสินค้าไม่สำเร็จ:", error);
-    }
-  };
+  }
+};
 
   const handleAddProduct = async () => {
     if (!Product_Name || !Price || !Description || !Product_image) {
-      alert("Please fill in all fields!");
-      return;
+        alert("Please fill in all fields!");
+        return;
     }
-  
-    const newProduct = {
-      name: Product_Name,
-      description: Description,
-      price: Price,
-      image: Product_image,
-    };
-  
+
+    // ใช้ FormData สำหรับอัปโหลดไฟล์
+    const formData = new FormData();
+    formData.append("name", Product_Name);
+    formData.append("description", Description);
+    formData.append("price", Price);
+    formData.append("Product_image", Product_image); // ต้องให้ชื่อ key ตรงกับ multer
+
     try {
-      const response = await axios.post("http://localhost:3000/api/products", newProduct);
-      console.log("✅ เพิ่มสินค้าสำเร็จ!", response.data);
-  
-      // ✅ เพิ่มสินค้าเข้า state เพื่ออัปเดต UI ทันที
-      setData([...data, response.data]);
-      loadData();
-      // ✅ เคลียร์ค่าในฟอร์ม
-      setProductName("");
-      setDescription("");
-      setPrice("");
-      setImage(null);
-      
-      // ✅ ปิด Modal
-      setOpen(false);
+        const response = await axios.post("http://localhost:3000/api/products", formData, {
+            headers: { "Content-Type": "multipart/form-data" }
+        });
+
+        console.log("✅ เพิ่มสินค้าสำเร็จ!", response.data);
+
+        // โหลดข้อมูลใหม่
+        loadData();
+
+        // ล้างค่า input
+        setProductName("");
+        setDescription("");
+        setPrice("");
+        setImage(null);
+        setOpen(false);
     } catch (error) {
-      console.error("❌ เพิ่มสินค้าไม่สำเร็จ:", error);
+        console.error("❌ เพิ่มสินค้าไม่สำเร็จ:", error);
     }
-  };
+};
+
 const handleDelete = async (id) => {
   if (!window.confirm("คุณแน่ใจหรือไม่ที่จะลบสินค้านี้?")) return;
 
@@ -167,9 +174,22 @@ const handleEdit = (product) => {
             {data.map((product, index) => (
               <TableRow key={product.Product_ID} style={{ background: "#f8f5e3" }}>
                 <TableCell>{index + 1}.</TableCell>
-                <TableCell>
-                  <img src={product.Product_image} alt={product.Product_Name} style={{ width: "50px", height: "50px", borderRadius: "5px" }} />
-                </TableCell>
+                  <TableCell>
+                    {product.Product_image ? (
+                      <img 
+                        src={`http://localhost:3000${product.Product_image}`} 
+                        alt={product.Product_Name} 
+                        onError={(e) => e.target.src = "https://via.placeholder.com/50"} 
+                        style={{ width: "50px", height: "50px", borderRadius: "5px" }} 
+                      />
+                    ) : (
+                      <img 
+                        src="https://via.placeholder.com/50" 
+                        alt="No Image" 
+                        style={{ width: "50px", height: "50px", borderRadius: "5px" }} 
+                      />
+                    )}
+                  </TableCell>
                 <TableCell>
                   <Typography fontWeight="bold">{product.Product_Name}</Typography>
                 </TableCell>
