@@ -15,10 +15,16 @@ const upload = multer({ storage });
 
 
 router.post("/", upload.single("Product_image"), manage_Product.createProduct);
+router.get("/sendToLine", manage_Product.sendProductsToLine);
 router.get("/", manage_Product.getAllProducts);
 router.get("/:id", manage_Product.getProductById);
 router.put("/:id", upload.single("Product_image"), manage_Product.updateProduct);
 router.delete("/:id", manage_Product.deleteProduct);
+
+
+
+module.exports = router;
+
 
 
 module.exports = router;

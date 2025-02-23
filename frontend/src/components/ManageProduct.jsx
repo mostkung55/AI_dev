@@ -152,12 +152,30 @@ const handleEdit = (product) => {
   setOpenEdit(true); // ✅ เปิด Modal แก้ไข
 };
 
+const handleSendToLine = async () => {
+  try {
+      const response = await axios.get("http://localhost:3000/api/products/sendToLine");
+      console.log("✅ ส่งเมนูไปยัง LINE สำเร็จ!");
+      alert("✅ ส่งเมนูสินค้าไปยัง LINE OA สำเร็จ!");
+  } catch (error) {
+      console.error("❌ ไม่สามารถส่งไปยัง LINE:", error);
+      alert("❌ เกิดข้อผิดพลาดในการส่งเมนู");
+  }
+};
+
   return (
     <div className="container">
       <Typography variant="h5" align="center" gutterBottom>
         Manage Product
       </Typography>
-
+                <Button 
+            variant="contained" 
+            color="success" 
+            onClick={handleSendToLine} 
+            style={{ marginBottom: "10px" }}
+          >
+            📤 ส่งเมนูไปยัง LINE OA
+          </Button>
       <TableContainer component={Paper}>
         <Table>
           <TableHead>

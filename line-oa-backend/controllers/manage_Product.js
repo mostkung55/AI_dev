@@ -1,13 +1,20 @@
 const db = require("../db"); // นำเข้า database connection
 const express = require("express");
-const productController = require('../controllers/manage_Product');
 const app = express();
 const cors = require("cors");
 const multer = require("multer");
+const line = require('@line/bot-sdk');
 
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+
+const config = {
+    channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
+    channelSecret: process.env.CHANNEL_SECRET,
+};
+const client = new line.Client(config);
 
 
 // CREATE: เพิ่มสินค้าใหม่
@@ -114,4 +121,96 @@ exports.deleteProduct = async (req, res) => {
         console.log(error)
     }
     
+};
+
+exports.generateProductMenu = async () => {
+    try {
+        const [products] = await db.query("SELECT Product_Name, Price, Description, Product_image FROM Product LIMIT 5");
+
+        if (products.length === 0) {
+            return null; // 🔹 ถ้าไม่มีสินค้าให้คืนค่า `null`
+        }
+
+        // 🔹 สร้าง Flex Message
+        const flexMessage = {
+            type: "flex",
+            altText: "เมนูสินค้าใหม่วันนี้",
+            contents: {
+                type: "carousel",
+                contents: products.map(product => ({
+                    type: "bubble",
+                    hero: {
+                        type: "image",
+                        url: `https://77bc-58-8-81-157.ngrok-free.app${product.Product_image}`,
+                        size: "full",
+                        aspectRatio: "20:13",
+                        aspectMode: "cover"
+                    },
+                    body: {
+                        type: "box",
+                        layout: "vertical",
+                        contents: [
+                            {
+                                type: "text",
+                                text: product.Product_Name,
+                                weight: "bold",
+                                size: "xl"
+                            },
+                            {
+                                type: "text",
+                                text: `฿${product.Price}`,
+                                size: "md",
+                                color: "#FF0000"
+                            },
+                            {
+                                type: "text",
+                                text: product.Description,
+                                size: "sm",
+                                wrap: true,
+                                color: "#666666"
+                            }
+                        ]
+                    }
+                }))
+            }
+        };
+
+        return flexMessage;
+    } catch (error) {
+        console.error("🚨 ไม่สามารถสร้างเมนูสินค้าได้:", error);
+        return null;
+    }
+};
+
+exports.sendProductsToLine = async (req, res) => {
+    try {
+        console.log("✅ sendProductsToLine ถูกเรียกใช้งาน");
+
+        const flexMessage = await exports.generateProductMenu();
+        // if (!flexMessage) {
+        //     console.log("❌ ไม่มีสินค้า");
+        //     return res.status(404).json({ message: "❌ ไม่มีสินค้าในระบบ" });
+        // }
+
+        console.log("📤 กำลังส่งเมนูไปยัง LINE OA...");
+
+        const [recipients] = await db.query("SELECT Customer_ID FROM Customer");
+
+        // if (!recipients || recipients.length === 0) {
+        //     console.log("❌ ไม่มีลูกค้าในระบบ");
+        //     return res.status(404).json({ message: "❌ ไม่มีลูกค้าในระบบ" });
+        // }
+
+        // 🔹 ส่งเมนูให้ลูกค้าทุกคน
+        for (const recipient of recipients) {
+            console.log(`📤 ส่งถึง: ${recipient.Customer_ID}`);
+            await client.pushMessage(recipient.Customer_ID, flexMessage);
+        }
+
+        console.log("✅ ส่งเมนูสินค้าไปยัง LINE OA สำเร็จ!");
+        res.status(200).json({ message: "✅ ส่งสินค้าไปยัง LINE สำเร็จ!" });
+    } catch (error) {
+        console.error("🚨 ไม่สามารถส่งสินค้าได้:", error);
+        res.status(500).json({ message: "❌ ไม่สามารถส่งสินค้าไปยัง LINE" });
+    }
 };

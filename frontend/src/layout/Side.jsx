@@ -10,7 +10,7 @@ import "./Side.css";
 
 
 const StyledSidebar = styled(Sidebar)(({ theme }) => ({
-    height: "100vh",
+    height: "115vh",
     width: "250px",
     background: theme.palette.primary.main,
     color: theme.palette.common.white,

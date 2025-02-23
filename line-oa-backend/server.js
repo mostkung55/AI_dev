@@ -6,6 +6,8 @@ const route_product = require("./routes/route_product");
 const axios = require("axios");
 const app = express();
 const cors = require('cors')
+const cron = require("node-cron");
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors());
@@ -41,7 +43,7 @@ app.get('/', async (req, res) => {
 });
 
 
-app.use("/api/products", route_product); // ใช้ routes ของสินค้า
+
 
 async function getUserProfile(userId) {
     try {
@@ -56,6 +58,7 @@ async function getUserProfile(userId) {
         return null;
     }
 }
+
 
 app.post('/webhook', async (req, res) => {
     const events = req.body.events;
@@ -85,70 +88,31 @@ app.post('/webhook', async (req, res) => {
     res.sendStatus(200);
 });
 
-
-async function handleEvent(event) {
-    const userId = event.source.userId;
-
-    if (event.type === 'follow') {
-        const profile = await getUserProfile(userId);
-        const customerName = profile ? profile.displayName : 'Unknown';
-
-        const [rows] = await db.query('SELECT * FROM customers WHERE Customer_ID = ?', [userId]);
-        if (rows.length === 0) {
-            await db.query(
-                'INSERT INTO customers (Customer_ID, Customer_Name) VALUES (?, ?)',
-                [userId, customerName]
-            );
-            console.log(`Added new customer: ${userId}`);
+const sendProductMenuToLine = async () => {
+    try {
+        const flexMessage = await generateProductMenu();
+        if (!flexMessage) {
+            console.log("❌ ไม่มีสินค้าในระบบ");
+            return;
         }
 
-        return client.replyMessage({
-            replyToken: event.replyToken,
-            messages: [{ type: 'text', text: 'ยินดีต้อนรับ! กรุณาบอกที่อยู่ของคุณเพื่อให้เราบันทึกข้อมูล' }],
-        });
-    } else if (event.type === 'message' && event.message.type === 'text') {
-        const userMessage = event.message.text;
-        const [rows] = await db.query('SELECT * FROM customers WHERE Customer_ID = ?', [userId]);
-        const customer = rows[0];
+        const [recipients] = await db.query("SELECT Customer_ID FROM Customer"); // 🔹 เปลี่ยนเป็น User ID หรือ Broadcast
+        await client.pushMessage(recipients, flexMessage);
 
-        if (!customer) {
-            const profile = await getUserProfile(userId);
-            const customerName = profile ? profile.displayName : 'Unknown';
-            await db.query(
-                'INSERT INTO customers (Customer_ID, Customer_Name) VALUES (?, ?)',
-                [userId, customerName]
-            );
-            return client.replyMessage({
-                replyToken: event.replyToken,
-                messages: [{ type: 'text', text: 'ยินดีต้อนรับ! กรุณาบอกที่อยู่ของคุณ' }],
-            });
-        }
-
-        if (!customer.Customer_Address) {
-            await db.query('UPDATE customers SET Customer_Address = ? WHERE Customer_ID = ?', [userMessage, userId]);
-            return client.replyMessage({
-                replyToken: event.replyToken,
-                messages: [{ type: 'text', text: 'บันทึกที่อยู่เรียบร้อยแล้ว! กรุณาบอกเบอร์โทรศัพท์ของคุณ' }],
-            });
-        } else if (!customer.Customer_Phone) {
-            await db.query('UPDATE customers SET Customer_Phone = ? WHERE Customer_ID = ?', [userMessage, userId]);
-            return client.replyMessage({
-                replyToken: event.replyToken,
-                messages: [{ type: 'text', text: 'บันทึกเบอร์โทรเรียบร้อยแล้ว! ข้อมูลของคุณครบถ้วนแล้ว' }],
-            });
-        } else {
-            return client.replyMessage({
-                replyToken: event.replyToken,
-                messages: [{
-                    type: 'text',
-                    text: `ข้อมูลของคุณ:\nชื่อ: ${customer.Customer_Name}\nที่อยู่: ${customer.Customer_Address}\nโทร: ${customer.Customer_Phone}`,
-                }],
-            });
-        }
+        console.log("✅ ส่งเมนูสินค้าไปยัง LINE OA สำเร็จ!");
+    } catch (error) {
+        console.error("🚨 ไม่สามารถส่งเมนูไปยัง LINE OA:", error);
     }
+};
 
-    return Promise.resolve(null);
-}
+// 🔹 ตั้งเวลาส่งเมนูสินค้าอัตโนมัติทุกวันเวลา 9 โมงเช้า
+cron.schedule("0 9 * * *", () => {
+    console.log("🔔 กำลังส่งเมนูสินค้าไปยัง LINE...");
+    sendProductMenuToLine();
+}, {
+    timezone: "Asia/Bangkok"
+});
+
 
 (async () => {
     try {

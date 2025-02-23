@@ -13,7 +13,7 @@
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@mui/icons-material": "^6.4.4",
-    "@mui/material": "^6.4.4",
+    "@mui/material": "^6.4.5",
     "axios": "^1.7.9",
     "browser-image-compression": "^2.0.2",
     "compressorjs": "^1.2.1",
@@ -22,6 +22,7 @@
     "react-dom": "^19.0.0",
     "react-pro-sidebar": "^1.1.0",
     "react-router-dom": "^7.1.5",
+    "recharts": "^2.15.1",
     "uuid": "^11.0.5"
   },
   "devDependencies": {
