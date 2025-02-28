@@ -24,7 +24,3 @@ router.delete("/:id", manage_Product.deleteProduct);
 
 
 module.exports = router;
-
-
-
-module.exports = router;

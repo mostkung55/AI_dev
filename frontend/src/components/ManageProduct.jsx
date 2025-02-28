@@ -1,5 +1,4 @@
 import React, { useState,useEffect } from "react";
-import { v4 as uuidv4 } from "uuid";
 import {
   Button,
   TextField,
@@ -18,27 +17,26 @@ import {
 import { Delete, Edit, Add } from "@mui/icons-material";
 import "./ManageProduct.css";
 import axios from "axios";
+import { Snackbar, Alert } from "@mui/material";
+import { CheckCircle, Cancel } from "@mui/icons-material";
 
 
 const ManageProduct = () => {
   useEffect(() => {
     loadData()
   },[])
-  const [products, setProducts] = useState([]);
   const [Product_Name, setProductName] = useState("");
-  const [Productdata, setProductdata] = useState({
-    "name" : " ",
-    "price" : " ",
-    "description" : " ",
-    "image" : " ",
-  });
   const [Description, setDescription] = useState("");
   const [Price, setPrice] = useState("");
   const [Product_image, setImage] = useState(null);
   const [open, setOpen] = useState(false);
-  const [editId, setEditId] = useState(null);
-  const [openAdd, setOpenAdd] = useState(false);  // ✅ สำหรับ Add Product
-  const [openEdit, setOpenEdit] = useState(false); // ✅ สำหรับ Edit Product
+  const [editId, setEditId] = useState(null); 
+  const [openEdit, setOpenEdit] = useState(false);
+
+  const [openPopup, setOpenPopup] = useState(false);
+  const [popupMessage, setPopupMessage] = useState("");
+  const [popupType, setPopupType] = useState("success"); // "success" หรือ "error"
+
 
 
   const [data,setData] = useState([]);
@@ -59,10 +57,52 @@ const ManageProduct = () => {
         setImage(file); // เก็บไฟล์ไว้ใน state
     }
 };
+  const showPopup = (message, type = "success") => {
+    setPopupMessage(message);
+    setPopupType(type);
+    setOpenPopup(true);
 
-const handleEditProduct = async () => {
-  if (!Product_Name || !Description || !Price) {
-      alert("Please fill in all fields!");
+    setTimeout(() => setOpenPopup(false), 2000); // ปิดอัตโนมัติใน 2 วินาที
+  };
+
+
+  const handleEditProduct = async () => {
+    if (!Product_Name || !Description || !Price) {
+        showPopup("Please fill in all fields!", "error");
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append("name", Product_Name);
+    formData.append("description", Description);
+    formData.append("price", Price);
+
+    if (Product_image instanceof File) {
+        formData.append("Product_image", Product_image);
+    }
+
+    try {
+        await axios.put(`http://localhost:3000/api/products/${editId}`, formData, {
+            headers: { "Content-Type": "multipart/form-data" }
+        });
+
+        showPopup(" แก้ไข Product สำเร็จ!", "success");
+        loadData();
+
+        setProductName("");
+        setDescription("");
+        setPrice("");
+        setImage(null);
+        setEditId(null);
+        setOpenEdit(false);
+    } catch (error) {
+        showPopup(" แก้ไข Product ไม่สำเร็จ!", "error");
+    }
+};
+
+const handleAddProduct = async () => {
+  if (!Product_Name || !Price || !Description || !Product_image) {
+      showPopup("Please fill in all fields!", "error");
       return;
   }
 
@@ -70,76 +110,36 @@ const handleEditProduct = async () => {
   formData.append("name", Product_Name);
   formData.append("description", Description);
   formData.append("price", Price);
-
-  // ✅ ถ้ามีการอัปโหลดไฟล์ใหม่ให้เพิ่มเข้าไป
-  if (Product_image instanceof File) {
-      formData.append("Product_image", Product_image); // ✅ ส่งไฟล์ไปกับ FormData
-  }
+  formData.append("Product_image", Product_image);
 
   try {
-      const response = await axios.put(`http://localhost:3000/api/products/${editId}`, formData, {
+      await axios.post("http://localhost:3000/api/products", formData, {
           headers: { "Content-Type": "multipart/form-data" }
       });
 
-      console.log("✅ อัปเดตสินค้าสำเร็จ!", response.data);
+      showPopup(" เพิ่มสินค้าสำเร็จ!", "success"); 
+      loadData();
 
-      loadData(); // โหลดข้อมูลใหม่
-
-      // ✅ ล้างค่าในฟอร์ม
       setProductName("");
       setDescription("");
       setPrice("");
       setImage(null);
-      setEditId(null);
-      setOpenEdit(false);
+      setOpen(false);
   } catch (error) {
-      console.error("❌ อัปเดตสินค้าไม่สำเร็จ:", error);
+      showPopup(" เพิ่มสินค้าไม่สำเร็จ!", "error");  
   }
-};
-
-  const handleAddProduct = async () => {
-    if (!Product_Name || !Price || !Description || !Product_image) {
-        alert("Please fill in all fields!");
-        return;
-    }
-
-    // ใช้ FormData สำหรับอัปโหลดไฟล์
-    const formData = new FormData();
-    formData.append("name", Product_Name);
-    formData.append("description", Description);
-    formData.append("price", Price);
-    formData.append("Product_image", Product_image); // ต้องให้ชื่อ key ตรงกับ multer
-
-    try {
-        const response = await axios.post("http://localhost:3000/api/products", formData, {
-            headers: { "Content-Type": "multipart/form-data" }
-        });
-
-        console.log("✅ เพิ่มสินค้าสำเร็จ!", response.data);
-
-        // โหลดข้อมูลใหม่
-        loadData();
-
-        // ล้างค่า input
-        setProductName("");
-        setDescription("");
-        setPrice("");
-        setImage(null);
-        setOpen(false);
-    } catch (error) {
-        console.error("❌ เพิ่มสินค้าไม่สำเร็จ:", error);
-    }
 };
 
 const handleDelete = async (id) => {
   if (!window.confirm("คุณแน่ใจหรือไม่ที่จะลบสินค้านี้?")) return;
 
   try {
-    await axios.delete(`http://localhost:3000/api/products/${id}`);
-    setData(data.filter((product) => product.Product_ID !== id)); // อัปเดต state
-    console.log(`✅ ลบสินค้าสำเร็จ: ${id}`);
+      await axios.delete(`http://localhost:3000/api/products/${id}`);
+      setData(data.filter((product) => product.Product_ID !== id));
+
+      showPopup(" ❌ลบสินค้าสำเร็จ!", "success");
   } catch (error) {
-    console.error("❌ ลบสินค้าไม่สำเร็จ:", error);
+      showPopup(" ❌ลบสินค้าไม่สำเร็จ!", "error");
   }
 };
 
@@ -168,6 +168,7 @@ const handleSendToLine = async () => {
       <Typography variant="h5" align="center" gutterBottom>
         Manage Product
       </Typography>
+      
                 <Button 
             variant="contained" 
             color="success" 
@@ -261,9 +262,7 @@ const handleSendToLine = async () => {
             {"Add New Product"}
           </Typography>
           <input type="file" accept="image/*" onChange={handleImageUpload} className="file-input" />
-          {Product_image && (
-            <img src={Product_image} alt="Preview" style={{ width: "100px", height: "100px", marginBottom: "10px" }} />
-          )}
+          
           <TextField
             label="Product Name"
             value={Product_Name}
@@ -310,6 +309,32 @@ const handleSendToLine = async () => {
             <Button variant="contained" color="secondary" onClick={handleEditProduct} fullWidth> Save Changes </Button>
           </Box>
         </Modal>
+                {/* ✅ Popup Modal ที่แสดงกลางจอ */}
+          <Modal open={openPopup} onClose={() => setOpenPopup(false)}>
+            <Box
+              sx={{
+                position: "absolute",
+                top: "50%",
+                left: "50%",
+                transform: "translate(-50%, -50%)",
+                bgcolor: "white",
+                boxShadow: 24,
+                p: 4,
+                borderRadius: 3,
+                textAlign: "center",
+              }}
+            >
+              {popupType === "success" ? (
+                <CheckCircle sx={{ fontSize: 60, color: "green" }} />
+              ) : (
+                <Cancel sx={{ fontSize: 60, color: "red" }} />
+              )}
+
+              <Typography variant="h6" sx={{ mt: 2, fontWeight: "bold" }}>
+                {popupMessage}
+              </Typography>
+            </Box>
+          </Modal>
     </div>
   );
 };

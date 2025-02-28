@@ -141,7 +141,7 @@ exports.generateProductMenu = async () => {
                     type: "bubble",
                     hero: {
                         type: "image",
-                        url: `https://77bc-58-8-81-157.ngrok-free.app${product.Product_image}`,
+                        url: `https://3a14-58-8-94-67.ngrok-free.app${product.Product_image}`,
                         size: "full",
                         aspectRatio: "20:13",
                         aspectMode: "cover"
@@ -182,24 +182,24 @@ exports.generateProductMenu = async () => {
     }
 };
 
-exports.sendProductsToLine = async (req, res) => {
+exports.sendProductsToLine = async (req, res = null) => {
     try {
         console.log("✅ sendProductsToLine ถูกเรียกใช้งาน");
 
         const flexMessage = await exports.generateProductMenu();
-        // if (!flexMessage) {
-        //     console.log("❌ ไม่มีสินค้า");
-        //     return res.status(404).json({ message: "❌ ไม่มีสินค้าในระบบ" });
-        // }
+        if (!flexMessage) {
+            console.log("❌ ไม่มีสินค้า");
+            return res.status(404).json({ message: "❌ ไม่มีสินค้าในระบบ" });
+        }
 
         console.log("📤 กำลังส่งเมนูไปยัง LINE OA...");
 
         const [recipients] = await db.query("SELECT Customer_ID FROM Customer");
 
-        // if (!recipients || recipients.length === 0) {
-        //     console.log("❌ ไม่มีลูกค้าในระบบ");
-        //     return res.status(404).json({ message: "❌ ไม่มีลูกค้าในระบบ" });
-        // }
+        if (!recipients || recipients.length === 0) {
+            console.log("❌ ไม่มีลูกค้าในระบบ");
+            return res.status(404).json({ message: "❌ ไม่มีลูกค้าในระบบ" });
+        }
 
         // 🔹 ส่งเมนูให้ลูกค้าทุกคน
         for (const recipient of recipients) {

@@ -1,10 +1,105 @@
-import React from "react";
-
+import React, { useState, useEffect } from "react";
+import {
+  Typography,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  IconButton,
+  Select,
+  MenuItem,
+} from "@mui/material";
+import { Delete, Edit } from "@mui/icons-material";
+import axios from "axios";
+import "./ManageOrder.css";
 
 const ManageOrder = () => {
-    return(
-        <div>ManageOrder</div>
-    )
-}
+  const [orders, setOrders] = useState([]);
 
-export default ManageOrder
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      const res = await axios.get("http://localhost:3000/api/orders");
+      setOrders(res.data);
+    } catch (err) {
+      console.error("🚨 Error fetching orders:", err);
+    }
+  };
+
+  // ✅ ฟังก์ชันอัปเดตสถานะ
+  const handleStatusChange = async (Order_ID, newStatus) => {
+    try {
+      await axios.put(`http://localhost:3000/api/orders/${Order_ID}`, { Status: newStatus });
+      setOrders((prevOrders) =>
+        prevOrders.map((order) =>
+          order.Order_ID === Order_ID ? { ...order, Status: newStatus } : order
+        )
+      );
+    } catch (error) {
+      console.error("🚨 Error updating status:", error);
+    }
+  };
+
+  return (
+    <div className="container">
+      <Typography variant="h5" align="center" gutterBottom>
+        Manage Order
+      </Typography>
+      <TableContainer component={Paper}>
+        <Table>
+          <TableHead>
+            <TableRow style={{ background: "#c5e1a5" }}>
+              <TableCell>Order ID</TableCell>
+              <TableCell>Customer ID</TableCell>
+              <TableCell>Address</TableCell>
+              <TableCell>Created At</TableCell>
+              <TableCell>Status</TableCell>
+              <TableCell>Total Amount</TableCell>
+              <TableCell>Manage</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {orders.map((order) => (
+              <TableRow key={order.Order_ID} style={{ background: "#f8f5e3" }}>
+                <TableCell>{order.Order_ID}</TableCell>
+                <TableCell>{order.Customer_ID}</TableCell>
+                <TableCell>{order.Customer_Address}</TableCell>
+                <TableCell>{new Date(order.Created_at).toLocaleString()}</TableCell>
+                <TableCell>
+                  {/* ✅ ใช้ Select Dropdown แทน Status ธรรมดา */}
+                  <Select
+                    value={order.Status}
+                    onChange={(e) => handleStatusChange(order.Order_ID, e.target.value)}
+                    size="small"
+                  >
+                    <MenuItem value="preparing">Preparing</MenuItem>
+                    <MenuItem value="delivering">Delivering</MenuItem>
+                    <MenuItem value="completed">Completed</MenuItem>
+                    <MenuItem value="paid">Paid</MenuItem>
+                  </Select>
+                </TableCell>
+                <TableCell>{order.Total_Amount} บาท</TableCell>
+                <TableCell>
+                  <IconButton color="warning">
+                    <Edit />
+                  </IconButton>
+                  <IconButton color="error">
+                    <Delete />
+                  </IconButton>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </div>
+  );
+};
+
+export default ManageOrder;
