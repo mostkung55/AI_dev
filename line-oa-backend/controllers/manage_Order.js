@@ -53,3 +53,27 @@ exports.updateOrderStatus = async (req, res) => {
       res.status(500).json({ message: "เกิดข้อผิดพลาดในการอัปเดตสถานะ" });
     }
   };
+
+  // DELETE: ลบคำสั่งซื้อ
+exports.deleteOrder = async (req, res) => {
+    try {
+      const { id } = req.params;
+  
+      if (!id) {
+        return res.status(400).json({ message: "กรุณาระบุ Order_ID ที่ต้องการลบ" });
+      }
+  
+      const sql = "DELETE FROM `Order` WHERE Order_ID = ?";
+      const [result] = await db.query(sql, [id]);
+  
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: "ไม่พบคำสั่งซื้อที่ต้องการลบ" });
+      }
+  
+      res.status(200).json({ message: "ลบคำสั่งซื้อสำเร็จ!" });
+    } catch (error) {
+      console.error("🚨 Error deleting order:", error);
+      res.status(500).json({ message: "เกิดข้อผิดพลาดในการลบคำสั่งซื้อ" });
+    }
+  };
+  

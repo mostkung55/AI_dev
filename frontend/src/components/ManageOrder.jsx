@@ -45,12 +45,22 @@ const ManageOrder = () => {
       console.error("🚨 Error updating status:", error);
     }
   };
+  const handleDelete = async (Order_ID) => {
+    if (!window.confirm("คุณแน่ใจหรือไม่ที่จะลบคำสั่งซื้อนี้?")) return;
+
+    try {
+      await axios.delete(`http://localhost:3000/api/orders/${Order_ID}`);
+      setOrders((prevOrders) => prevOrders.filter((order) => order.Order_ID !== Order_ID));
+    } catch (error) {
+      console.error("🚨 Error deleting order:", error);
+    }
+  };
 
   return (
     <div className="container">
-      <Typography variant="h5" align="center" gutterBottom>
-        Manage Order
-      </Typography>
+      <Typography variant="h4" align="center" gutterBottom>
+          📦 Manage Orders
+        </Typography>
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
@@ -67,12 +77,11 @@ const ManageOrder = () => {
           <TableBody>
             {orders.map((order) => (
               <TableRow key={order.Order_ID} style={{ background: "#f8f5e3" }}>
-                <TableCell>{order.Order_ID}</TableCell>
+                <TableCell>{order.Order_ID}.</TableCell>
                 <TableCell>{order.Customer_ID}</TableCell>
                 <TableCell>{order.Customer_Address}</TableCell>
                 <TableCell>{new Date(order.Created_at).toLocaleString()}</TableCell>
                 <TableCell>
-                  {/* ✅ ใช้ Select Dropdown แทน Status ธรรมดา */}
                   <Select
                     value={order.Status}
                     onChange={(e) => handleStatusChange(order.Order_ID, e.target.value)}
@@ -86,10 +95,7 @@ const ManageOrder = () => {
                 </TableCell>
                 <TableCell>{order.Total_Amount} บาท</TableCell>
                 <TableCell>
-                  <IconButton color="warning">
-                    <Edit />
-                  </IconButton>
-                  <IconButton color="error">
+                  <IconButton color="error" onClick={() => handleDelete(order.Order_ID)}>
                     <Delete />
                   </IconButton>
                 </TableCell>
