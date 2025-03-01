@@ -21,12 +21,15 @@ exports.getOrder = async (req, res) => {
 exports.createOrder = async (req, res) => {
   try {
     const { Customer_ID, Customer_Address, Total_Amount, Status } = req.body;
+
+    const Created_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+
     if (!Customer_ID || !Customer_Address || !Total_Amount || !Status) {
       return res.status(400).json({ message: "กรุณากรอกข้อมูลให้ครบถ้วน" });
     }
 
-    const sql = "INSERT INTO `Order` (Customer_ID, Customer_Address, Total_Amount, Created_at, Status) VALUES (?, ?, ?, NOW(), ?)";
-    const [result] = await db.query(sql, [Customer_ID, Customer_Address, Total_Amount, Status]);
+    const sql = "INSERT INTO `Order` (Customer_ID, Customer_Address, Total_Amount, Created_at, Status) VALUES (?, ?, ?, ?, ?)";
+    const [result] = await db.query(sql, [Customer_ID, Customer_Address, Total_Amount, Created_at, Status]);
 
     res.status(201).json({ message: "เพิ่มคำสั่งซื้อสำเร็จ!", orderId: result.insertId });
   } catch (error) {

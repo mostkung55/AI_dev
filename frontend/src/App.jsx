@@ -7,6 +7,7 @@ import Dashboard from './components/Dashboard';
 import ManageIngre from './components/ManageIngre';
 import ManageOrder from './components/ManageOrder';
 import ManageProduct from './components/ManageProduct';
+import OrderItem from "./components/Order_item";
 import { Button } from '@mui/material';
 
 
@@ -36,6 +37,7 @@ function App() {
             <Route path="/Product" element={<ManageProduct />} />
             <Route path="/Ingre" element={<ManageIngre />} />
             <Route path="/Order" element={<ManageOrder />} />
+            <Route path="/Order_item" element={<OrderItem />} />
           </Routes>
         </div>
       </div>

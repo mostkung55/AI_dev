@@ -9,6 +9,8 @@ const cors = require('cors')
 const cron = require("node-cron");
 const { sendProductsToLine } = require("./controllers/manage_Product");
 const route_order = require('./routes/route_order')
+const route_orderitem = require('./routes/route_orderitems')
+
 const path = require("path");
 const { exec } = require("child_process");
 
@@ -18,6 +20,8 @@ app.use(cors());
 app.use('/api/products', route_product);
 app.use("/uploads", express.static("uploads"));
 app.use("/api/orders", route_order);
+app.use("/api/order_items",route_orderitem);
+
 
 
 
@@ -82,12 +86,14 @@ app.post("/webhook", async (req, res) => {
             }
 
             try {
+                // ✅ บันทึกลูกค้า
                 await db.query(
-                    `INSERT INTO Customer (Customer_ID, Customer_Name) VALUES (?, ?) ON DUPLICATE KEY UPDATE Customer_Name = VALUES(Customer_Name)`,
+                    `INSERT INTO Customer (Customer_ID, Customer_Name) VALUES (?, ?) 
+                     ON DUPLICATE KEY UPDATE Customer_Name = VALUES(Customer_Name)`,
                     [customerId, customerName]
                 );
 
-                // เรียกใช้งานโมเดล Python เพื่อตรวจจับออเดอร์
+                // ✅ เรียกโมเดล Python
                 const modelPath = path.join(__dirname, "..", "model", "model.py");
                 exec(`python "${modelPath}" "${customerText}"`, async (error, stdout) => {
                     if (error) {
@@ -95,57 +101,66 @@ app.post("/webhook", async (req, res) => {
                         return;
                     }
 
-                    let orders = JSON.parse(stdout);
-                    if (orders.length === 0) {
+                    let orders;
+                    try {
+                        orders = JSON.parse(stdout);
+                    } catch (parseError) {
+                        console.error("❌ JSON Parse Error:", parseError);
+                        await client.replyMessage(event.replyToken, { type: "text", text: "เกิดข้อผิดพลาด กรุณาลองใหม่" });
+                        return;
+                    }
+
+                    if (!Array.isArray(orders) || orders.length === 0) {
                         await client.replyMessage(event.replyToken, { type: "text", text: "❌ ไม่พบสินค้าที่ตรงกับคำสั่งของคุณ" });
                         return;
                     }
 
                     let totalAmount = 0;
+                    let orderItemsToInsert = [];
+
                     for (let order of orders) {
                         const [rows] = await db.query(
                             "SELECT Price FROM Product WHERE Product_ID = ?",
-                            [order.Product_ID]
+                            [order.Product_ID] // ✅ ใช้ชื่อให้ตรงกับ Python Model
                         );
                         if (!rows.length) continue;
+
                         let price = parseFloat(rows[0].Price);
                         let subtotal = price * order.quantity;
                         totalAmount += subtotal;
+
+                        orderItemsToInsert.push({
+                            product_id: order.Product_ID, // ✅ เปลี่ยนให้ตรงกับฐานข้อมูล
+                            quantity: order.quantity,
+                            subtotal: subtotal
+                        });
                     }
 
-                    // บันทึกข้อมูลคำสั่งซื้อ
+                    // ✅ บันทึกข้อมูลคำสั่งซื้อ
                     const [orderResult] = await db.query(
-                        "INSERT INTO `Order` (Customer_ID, Total_Amount,Customer_Address, Status) VALUES (?, ?, ? , 'Preparing')",
+                        "INSERT INTO `Order` (Customer_ID, Total_Amount, Customer_Address, Status) VALUES (?, ?, ?, 'Preparing')",
                         [customerId, totalAmount, "ที่อยู่ลูกค้า (อัปเดตทีหลัง)"]
                     );
                     const orderId = orderResult.insertId;
 
-                    for (let order of orders) {
-                        const [rows] = await db.query(
-                            "SELECT Price FROM Product WHERE Product_ID = ?",
-                            [order.product_id]
-                        );
-                        if (!rows.length) continue;
-                        let price = parseFloat(rows[0].Price);
-                        let subtotal = price * order.Quantity;
-
+                    // ✅ บันทึกข้อมูล Order Items ในฐานข้อมูล
+                    for (let item of orderItemsToInsert) {
                         await db.query(
-                            "INSERT INTO Order_item (Order_ID, Product_ID, Quantity, Subtotal, Status) VALUES (?, ?, ?, ?, 'Preparing')",
-                            [orderId, order.product_id, quantity, subtotal]
+                            "INSERT INTO Order_Item (Order_ID, Product_ID, Quantity, Subtotal, Status) VALUES (?, ?, ?, ?, 'Preparing')",
+                            [orderId, item.product_id, item.quantity, item.subtotal]
                         );
                     }
 
-
-
-                
-                    // ตอบกลับลูกค้า
+                    // ✅ ตอบกลับลูกค้า
                     let replyText = "📦 คำสั่งซื้อของคุณ:\n";
-                    orders.forEach(Order => {
-                        replyText += `✅ ${Order.menu} จำนวน ${Order.quantity} ชิ้น\n`;
+                    orders.forEach(order => {
+                        replyText += `✅ ${order.menu} จำนวน ${order.quantity} ชิ้น\n`;
                     });
                     replyText += `💰 ยอดรวม: ${totalAmount} บาท`;
+
                     await client.replyMessage(event.replyToken, { type: "text", text: replyText });
                 });
+
             } catch (error) {
                 console.error("🚨 Error processing order:", error);
             }

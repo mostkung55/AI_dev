@@ -141,7 +141,7 @@ exports.generateProductMenu = async () => {
                     type: "bubble",
                     hero: {
                         type: "image",
-                        url: `https://3a14-58-8-94-67.ngrok-free.app${product.Product_image}`,
+                        url: `https://49ff-58-8-94-67.ngrok-free.app${product.Product_image}`,
                         size: "full",
                         aspectRatio: "20:13",
                         aspectMode: "cover"
