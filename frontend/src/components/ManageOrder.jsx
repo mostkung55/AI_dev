@@ -12,7 +12,7 @@ import {
   Select,
   MenuItem,
 } from "@mui/material";
-import { Delete, Edit } from "@mui/icons-material"; // ใช้ Edit 📝 แทน Visibility
+import { Delete, ListAlt as ListAltIcon } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom"; 
 import axios from "axios";
 import "./ManageOrder.css";
@@ -79,7 +79,7 @@ const ManageOrder = () => {
                     color="primary" 
                     onClick={() => navigate(`/order_item?order_id=${order.Order_ID}`)}
                   >
-                    <Edit /> 
+                   <ListAltIcon />  
                   </IconButton>
                   {/* 🗑️ ปุ่มลบ */}
                   <IconButton color="error" onClick={() => handleDelete(order.Order_ID)}>

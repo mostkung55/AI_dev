@@ -300,9 +300,7 @@ const handleSendToLine = async () => {
           <Box className="modal-box">
             <Typography variant="h6" gutterBottom> Edit Product </Typography>
             <input type="file" accept="image/*" onChange={handleImageUpload} className="file-input" />
-            {Product_image && (
-              <img src={Product_image} alt="Preview" style={{ width: "100px", height: "100px", marginBottom: "10px" }} />
-            )}
+            {Product_image }
             <TextField label="Product Name" value={Product_Name} onChange={(e) => setProductName(e.target.value)} fullWidth margin="normal" size="small"/>
             <TextField label="Description" value={Description} onChange={(e) => setDescription(e.target.value)} fullWidth margin="normal" size="small" multiline rows={3}/>
             <TextField label="Price" type="number" value={Price} onChange={(e) => setPrice(e.target.value)} fullWidth margin="normal" size="small"/>

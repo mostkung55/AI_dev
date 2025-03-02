@@ -49,7 +49,7 @@ const OrderItem = () => {
       <TableContainer component={Paper} className="order-table">
         <Table>
           <TableHead>
-            <TableRow className="order-header">
+            <TableRow style={{ background: "#c5e1a5" }}>
               <TableCell>Item</TableCell>
               <TableCell>Price</TableCell>
               <TableCell>Quantity</TableCell>
@@ -60,7 +60,7 @@ const OrderItem = () => {
           <TableBody>
             {orderItems.length > 0 ? (
               orderItems.map((item) => (
-                <TableRow key={item.Order_ItemID} className="order-row">
+                <TableRow key={item.Order_ItemID} style={{ background: "#f8f5e3" }}>
                   <TableCell>
                     <Typography variant="subtitle1" fontWeight="bold">{item.Product_name}</Typography>
                   </TableCell>

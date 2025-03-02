@@ -79,14 +79,38 @@ app.post("/webhook", async (req, res) => {
             let customerText = event.message.text;
             let customerName = "ลูกค้า";
 
-            // ดึงข้อมูลโปรไฟล์ลูกค้า
-            const profile = await getUserProfile(customerId);
-            if (profile) {
-                customerName = profile.displayName;
-            }
-
             try {
-                // ✅ บันทึกลูกค้า
+                // ✅ ตรวจสอบว่าลูกค้ากำลังพิมพ์ที่อยู่หรือไม่
+                const [waitingOrder] = await db.query(
+                    "SELECT Order_ID FROM `Order` WHERE Customer_ID = ? AND Status = 'Awaiting Address'",
+                    [customerId]
+                );
+
+                if (waitingOrder.length > 0) {
+                    let orderId = waitingOrder[0].Order_ID;
+
+                    // ✅ บันทึกที่อยู่ลงใน Order
+                    await db.query(
+                        "UPDATE `Order` SET Customer_Address = ?, Status = 'Preparing' WHERE Order_ID = ?",
+                        [customerText, orderId]
+                    );
+
+                    // ✅ แจ้งลูกค้าว่าที่อยู่ถูกบันทึกแล้ว
+                    await client.replyMessage(event.replyToken, {
+                        type: "text",
+                        text: `✅ ที่อยู่ของคุณถูกบันทึกเรียบร้อยแล้ว!\n📍 ที่อยู่: ${customerText}\n🛵 กำลังเตรียมคำสั่งซื้อของคุณ`
+                    });
+
+                    return;
+                }
+
+                // ✅ ดึงข้อมูลโปรไฟล์ลูกค้า
+                const profile = await getUserProfile(customerId);
+                if (profile) {
+                    customerName = profile.displayName;
+                }
+
+                // ✅ บันทึกลูกค้า (ถ้ายังไม่มี)
                 await db.query(
                     `INSERT INTO Customer (Customer_ID, Customer_Name) VALUES (?, ?) 
                      ON DUPLICATE KEY UPDATE Customer_Name = VALUES(Customer_Name)`,
@@ -116,12 +140,12 @@ app.post("/webhook", async (req, res) => {
                     }
 
                     let totalAmount = 0;
-                    let orderItemsToInsert = [];
+                    let orderItems = [];
 
                     for (let order of orders) {
                         const [rows] = await db.query(
                             "SELECT Price FROM Product WHERE Product_ID = ?",
-                            [order.Product_ID] // ✅ ใช้ชื่อให้ตรงกับ Python Model
+                            [order.Product_ID]
                         );
                         if (!rows.length) continue;
 
@@ -129,46 +153,141 @@ app.post("/webhook", async (req, res) => {
                         let subtotal = price * order.quantity;
                         totalAmount += subtotal;
 
-                        orderItemsToInsert.push({
-                            product_id: order.Product_ID, // ✅ เปลี่ยนให้ตรงกับฐานข้อมูล
+                        orderItems.push({
+                            product_id: order.Product_ID,
+                            menu: order.menu,
                             quantity: order.quantity,
                             subtotal: subtotal
                         });
                     }
 
-                    // ✅ บันทึกข้อมูลคำสั่งซื้อ
+                    // ✅ สร้าง Flex Message ให้ลูกค้ายืนยัน (แต่ยังไม่บันทึกลง Database)
+                    const confirmMessage = {
+                        type: "flex",
+                        altText: "กรุณายืนยันคำสั่งซื้อ",
+                        contents: {
+                            type: "bubble",
+                            body: {
+                                type: "box",
+                                layout: "vertical",
+                                contents: [
+                                    { type: "text", text: "ยืนยันคำสั่งซื้อ", weight: "bold", size: "xl" },
+                                    ...orderItems.map(order => ({
+                                        type: "text",
+                                        text: `- ${order.menu} x ${order.quantity} ชิ้น (${order.subtotal} บาท)`,
+                                        wrap: true
+                                    })),
+                                    { type: "text", text: `💰 ยอดรวม: ${totalAmount} บาท`, weight: "bold", margin: "md" }
+                                ]
+                            },
+                            footer: {
+                                type: "box",
+                                layout: "horizontal",
+                                spacing: "sm",
+                                contents: [
+                                    {
+                                        type: "button",
+                                        style: "primary",
+                                        color: "#1DB446",
+                                        action: {
+                                            type: "postback",
+                                            label: "Confirm",
+                                            data: JSON.stringify({ action: "confirm_order", customerId, orderItems, totalAmount })
+                                        }
+                                    },
+                                    {
+                                        type: "button",
+                                        style: "secondary",
+                                        color: "#AAAAAA",
+                                        action: {
+                                            type: "postback",
+                                            label: "Cancel",
+                                            data: JSON.stringify({ action: "cancel_order", customerId })
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    };
+
+                    // ✅ ส่ง Flex Message ให้ลูกค้ากดยืนยัน
+                    await client.replyMessage(event.replyToken, confirmMessage);
+                });
+
+            } catch (error) {
+                console.error("🚨 Error processing order:", error);
+            }
+        } 
+        
+        // ✅ ตรวจจับเมื่อมีการกดปุ่ม Confirm หรือ Cancel
+        else if (event.type === "postback") {
+            let data;
+            try {
+                data = JSON.parse(event.postback.data);
+            } catch (error) {
+                console.error("❌ JSON Parse Error in postback:", error);
+                return;
+            }
+        
+            if (data.action === "confirm_order") {
+                try {
+                    // ✅ ตรวจสอบว่าคำสั่งซื้อได้รับการยืนยันไปแล้วหรือไม่
+                    const [existingOrder] = await db.query(
+                        "SELECT Order_ID FROM `Order` WHERE Customer_ID = ? AND Status = 'Awaiting Address'",
+                        [data.customerId]
+                    );
+        
+                    if (existingOrder.length > 0) {
+                        // ✅ ถ้าสั่งซื้อไปแล้ว ให้แจ้งเตือนว่าห้ามกดย้ำ
+                        await client.replyMessage(event.replyToken, {
+                            type: "text",
+                            text: "❌ คำสั่งซื้อนี้ได้รับการยืนยันแล้ว กรุณาส่งที่อยู่ของคุณ"
+                        });
+                        return;
+                    }
+        
+                    // ✅ บันทึก Order ลงฐานข้อมูล (แต่ยังไม่มีที่อยู่)
                     const [orderResult] = await db.query(
-                        "INSERT INTO `Order` (Customer_ID, Total_Amount, Customer_Address, Status) VALUES (?, ?, ?, 'Preparing')",
-                        [customerId, totalAmount, "ที่อยู่ลูกค้า (อัปเดตทีหลัง)"]
+                        "INSERT INTO `Order` (Customer_ID, Total_Amount, Customer_Address, Status) VALUES (?, ?, NULL, 'Awaiting Address')",
+                        [data.customerId, data.totalAmount]
                     );
                     const orderId = orderResult.insertId;
-
-                    // ✅ บันทึกข้อมูล Order Items ในฐานข้อมูล
-                    for (let item of orderItemsToInsert) {
+        
+                    // ✅ บันทึก Order Items
+                    for (let item of data.orderItems) {
                         await db.query(
                             "INSERT INTO Order_Item (Order_ID, Product_ID, Quantity, Subtotal, Status) VALUES (?, ?, ?, ?, 'Preparing')",
                             [orderId, item.product_id, item.quantity, item.subtotal]
                         );
                     }
-
-                    // ✅ ตอบกลับลูกค้า
-                    let replyText = "📦 คำสั่งซื้อของคุณ:\n";
-                    orders.forEach(order => {
-                        replyText += `✅ ${order.menu} จำนวน ${order.quantity} ชิ้น\n`;
+        
+                    // ✅ ลบปุ่มและส่งข้อความใหม่
+                    await client.replyMessage(event.replyToken, {
+                        type: "text",
+                        text: "✅ คำสั่งซื้อของคุณได้รับการยืนยันแล้ว!\n📍 กรุณาส่งที่อยู่สำหรับจัดส่งสินค้าของคุณ"
                     });
-                    replyText += `💰 ยอดรวม: ${totalAmount} บาท`;
-
-                    await client.replyMessage(event.replyToken, { type: "text", text: replyText });
+        
+                } catch (error) {
+                    console.error("❌ Error saving order:", error);
+                    await client.replyMessage(event.replyToken, { type: "text", text: "เกิดข้อผิดพลาด กรุณาลองใหม่" });
+                }
+            } 
+            else if (data.action === "cancel_order") {
+                // ✅ ส่งข้อความใหม่แทนปุ่ม
+                await client.replyMessage(event.replyToken, {
+                    type: "text",
+                    text: "❌ คำสั่งซื้อของคุณถูกยกเลิกเรียบร้อยแล้ว"
                 });
-
-            } catch (error) {
-                console.error("🚨 Error processing order:", error);
             }
         }
     }
 
     res.sendStatus(200);
 });
+
+
+
+
 
 
 
@@ -191,7 +310,7 @@ app.post("/webhook", async (req, res) => {
 // };
 
 
-cron.schedule("0 18 * * *", async () => {
+cron.schedule("0 12 * * *", async () => {
     console.log("🔔 กำลังส่งเมนูสินค้าไปยัง LINE...");
     try {
         await sendProductsToLine();
@@ -225,4 +344,6 @@ const PORT = 3000;
 app.listen(PORT, () => {
     console.log('Server is running on port 3000');
 });
+
+
 
