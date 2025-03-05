@@ -80,4 +80,99 @@ exports.deleteOrder = async (req, res) => {
       res.status(500).json({ message: "เกิดข้อผิดพลาดในการลบคำสั่งซื้อ" });
     }
   };
-  
+
+  // ✅ ตรวจสอบวัตถุดิบก่อนบันทึก Order
+  exports.checkIngredientsAvailability = async (orderItems) => {
+    let insufficientIngredients = [];
+
+    for (let item of orderItems) {
+        const [product] = await db.query(
+            "SELECT Ingredients FROM Product WHERE Product_ID = ?", 
+            [item.product_id]
+        );
+
+        if (product.length === 0) {
+            return { success: false, message: `❌ ไม่พบสินค้า ${item.product_id}` };
+        }
+
+        let ingredients = [];
+
+        // ✅ ตรวจสอบว่า Ingredients เป็น JSON String หรือ Object
+        if (typeof product[0].Ingredients === "string") {
+            try {
+                ingredients = JSON.parse(product[0].Ingredients); // ✅ แปลงเป็น JSON ถ้าเป็น String
+            } catch (error) {
+                console.error("🚨 JSON Parse Error (Ingredients):", error);
+                return { success: false, message: "❌ ข้อมูล Ingredients ไม่ถูกต้อง" };
+            }
+        } else if (typeof product[0].Ingredients === "object" && product[0].Ingredients !== null) {
+            ingredients = product[0].Ingredients; // ✅ ถ้าเป็น Object แล้ว ใช้ได้เลย
+        } else {
+            ingredients = []; // ✅ ถ้าไม่มีข้อมูล ให้เป็น Array ว่าง
+        }
+
+        for (let ing of ingredients) {
+            const [ingredient] = await db.query(
+                "SELECT Quantity FROM Ingredient WHERE Ingredient_ID = ?", 
+                [ing.id]
+            );
+
+            if (ingredient.length === 0) {
+                return { success: false, message: `❌ ไม่พบวัตถุดิบ ${ing.name}` };
+            }
+
+            if (ingredient[0].Quantity < ing.quantity * item.quantity) {
+                insufficientIngredients.push({ 
+                    name: ing.name, 
+                    required: ing.quantity * item.quantity, 
+                    available: ingredient[0].Quantity 
+                });
+            }
+        }
+    }
+
+    if (insufficientIngredients.length > 0) {
+        return {
+            success: false,
+            message: "❌ วัตถุดิบไม่เพียงพอ:\n" + insufficientIngredients.map(ing => `- ${ing.name}: ต้องการ ${ing.required}, มี ${ing.available}`).join("\n")
+        };
+    }
+
+    return { success: true };
+};
+
+
+// ✅ หักวัตถุดิบออกจาก Stock เมื่อคำสั่งซื้อได้รับการยืนยัน
+exports.deductIngredientsFromStock = async (orderItems) => {
+  for (let item of orderItems) {
+      const [product] = await db.query(
+          "SELECT Ingredients FROM Product WHERE Product_ID = ?", 
+          [item.product_id]
+      );
+
+      // console.log(" ค่าที่ได้จาก Database (Ingredients):", product[0].Ingredients); // ✅ Debug
+
+      let ingredients = [];
+
+      // ✅ ตรวจสอบว่า Ingredients เป็น JSON String หรือ Object
+      if (typeof product[0].Ingredients === "string") {
+          try {
+              ingredients = JSON.parse(product[0].Ingredients); // ✅ แปลงเป็น JSON ถ้าเป็น String
+          } catch (error) {
+              console.error("🚨 JSON Parse Error (Ingredients):", error);
+              return { success: false, message: "❌ ข้อมูล Ingredients ไม่ถูกต้อง" };
+          }
+      } else if (typeof product[0].Ingredients === "object" && product[0].Ingredients !== null) {
+          ingredients = product[0].Ingredients; // ✅ ถ้าเป็น Object อยู่แล้ว ใช้ได้เลย
+      } else {
+          ingredients = []; // ✅ ถ้าไม่มีข้อมูล ให้เป็น Array ว่าง
+      }
+
+      for (let ing of ingredients) {
+          await db.query(
+              "UPDATE Ingredient SET Quantity = Quantity - ? WHERE Ingredient_ID = ?", 
+              [ing.quantity * item.quantity, ing.id]
+          );
+      }
+  }
+};

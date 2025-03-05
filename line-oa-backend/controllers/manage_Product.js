@@ -1,4 +1,4 @@
-const db = require("../db"); // นำเข้า database connection
+const db = require("../db");
 const express = require("express");
 const app = express();
 const cors = require("cors");
@@ -24,15 +24,16 @@ exports.createProduct = async (req, res) => {
             return res.status(400).json({ message: "กรุณาอัปโหลดไฟล์รูปภาพ" });
         }
 
-        const { name, price, description } = req.body;
-        if (!name || !description || !price) {
+        const { name, price, description, ingredients } = req.body;
+        if (!name || !description || !price || !ingredients) {
             return res.status(400).json({ message: "กรุณากรอกข้อมูลให้ครบถ้วน" });
         }
 
-        const imagePath = `/uploads/${req.file.filename}`; // ✅ เก็บเส้นทางไฟล์รูป
+        const imagePath = `/uploads/${req.file.filename}`;
+        const ingredientsJson = JSON.stringify(ingredients); // ✅ แปลง JSON ก่อนบันทึก
 
-        const sql = "INSERT INTO Product (Product_Name, Price, Description, Product_image) VALUES (?, ?, ?, ?)";
-        const [result] = await db.query(sql, [name, price, description, imagePath]);
+        const sql = "INSERT INTO Product (Product_Name, Price, Description, Product_image, Ingredients) VALUES (?, ?, ?, ?, ?)";
+        const [result] = await db.query(sql, [name, price, description, imagePath, ingredientsJson]);
 
         res.status(201).json({ message: "เพิ่มสินค้าสำเร็จ!", productId: result.insertId });
     } catch (error) {
@@ -45,14 +46,41 @@ exports.createProduct = async (req, res) => {
 // READ: ดึงข้อมูลสินค้าทั้งหมด
 exports.getAllProducts = async (req, res) => {
     try {
-        const [products] = await db.query("SELECT * FROM Product");
-        res.status(200).json(products)
-    } catch (error) {
-        console.log(error)
-    }
-    
+        const sql = "SELECT * FROM Product";
+        const [products] = await db.query(sql);
 
+        // ✅ ตรวจสอบค่า Ingredients ก่อน `JSON.parse()`
+        const updatedProducts = products.map(p => {
+            console.log("🔍 ค่าที่ได้จาก Database:", p.Ingredients);
+
+            let ingredientsArray = [];
+
+            if (p.Ingredients) {
+                if (typeof p.Ingredients === "string") {
+                    try {
+                        ingredientsArray = JSON.parse(p.Ingredients); // ✅ แปลงเฉพาะถ้าเป็น String
+                    } catch (error) {
+                        console.error("🚨 JSON Parse Error:", error);
+                    }
+                } else if (typeof p.Ingredients === "object") {
+                    ingredientsArray = p.Ingredients; // ✅ ถ้าเป็น Object อยู่แล้ว ไม่ต้องแปลง
+                }
+            }
+
+            return {
+                ...p,
+                Ingredients: ingredientsArray
+            };
+        });
+
+        res.status(200).json(updatedProducts);
+    } catch (error) {
+        console.error("🚨 ดึงข้อมูลสินค้าไม่สำเร็จ:", error);
+        res.status(500).json({ message: "เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์" });
+    }
 };
+
+
 
 // READ: ดึงข้อมูลสินค้าตาม ID
 exports.getProductById = async (req, res) => {
@@ -74,7 +102,7 @@ exports.getProductById = async (req, res) => {
 exports.updateProduct = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, price, description } = req.body;
+        const { name, price, description, ingredients } = req.body; // ✅ รับ ingredients จาก request
 
         // 🔹 ดึงค่ารูปภาพปัจจุบันจากฐานข้อมูลก่อน
         const [existingProduct] = await db.query("SELECT Product_image FROM Product WHERE Product_ID = ?", [id]);
@@ -89,8 +117,12 @@ exports.updateProduct = async (req, res) => {
             imagePath = `/uploads/${req.file.filename}`; // ✅ ใช้รูปใหม่ถ้ามีการอัปโหลด
         }
 
-        const sql = "UPDATE Product SET Product_Name = ?, Price = ?, Description = ?, Product_image = ? WHERE Product_ID = ?";
-        const [product] = await db.query(sql, [name, price, description, imagePath, id]);
+        // ✅ แปลง Ingredients เป็น JSON String
+        const ingredientsJSON = ingredients ? JSON.stringify(JSON.parse(ingredients)) : null;
+
+        // 🔹 อัปเดตข้อมูลสินค้า
+        const sql = "UPDATE Product SET Product_Name = ?, Price = ?, Description = ?, Product_image = ?, Ingredients = ? WHERE Product_ID = ?";
+        const [product] = await db.query(sql, [name, price, description, imagePath, ingredientsJSON, id]);
 
         if (product.affectedRows === 0) {
             return res.status(404).json({ message: "ไม่พบสินค้า" });
@@ -103,6 +135,8 @@ exports.updateProduct = async (req, res) => {
         res.status(500).json({ message: "เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์" });
     }
 };
+
+
 
 
 
@@ -141,7 +175,7 @@ exports.generateProductMenu = async () => {
                     type: "bubble",
                     hero: {
                         type: "image",
-                        url: `https://a498-58-8-94-67.ngrok-free.app${product.Product_image}`,
+                        url: `https://b5cb-58-8-92-42.ngrok-free.app${product.Product_image}`,
                         size: "full",
                         aspectRatio: "20:13",
                         aspectMode: "cover"

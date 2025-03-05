@@ -8,11 +8,18 @@ const app = express();
 const cors = require('cors')
 const cron = require("node-cron");
 const { sendProductsToLine } = require("./controllers/manage_Product");
-const route_order = require('./routes/route_order')
-const route_orderitem = require('./routes/route_orderitems')
+const route_order = require('./routes/route_order');
+const route_orderitem = require('./routes/route_orderitems');
+const route_ingredient = require('./routes/route_ingredient');
+const { checkIngredientsAvailability, deductIngredientsFromStock } = require("./controllers/manage_Order");
 
 const path = require("path");
 const { exec } = require("child_process");
+
+const EventEmitter = require('events');
+EventEmitter.defaultMaxListeners = 20; // เพิ่ม Limit ของ EventEmitter
+
+
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -21,9 +28,7 @@ app.use('/api/products', route_product);
 app.use("/uploads", express.static("uploads"));
 app.use("/api/orders", route_order);
 app.use("/api/order_items",route_orderitem);
-
-
-
+app.use("/api/ingredient",route_ingredient);
 
 
 
@@ -231,28 +236,23 @@ app.post("/webhook", async (req, res) => {
         
             if (data.action === "confirm_order") {
                 try {
-                    // ✅ ตรวจสอบว่าคำสั่งซื้อได้รับการยืนยันไปแล้วหรือไม่
-                    const [existingOrder] = await db.query(
-                        "SELECT Order_ID FROM `Order` WHERE Customer_ID = ? AND Status = 'Awaiting Address'",
-                        [data.customerId]
-                    );
-        
-                    if (existingOrder.length > 0) {
-                        // ✅ ถ้าสั่งซื้อไปแล้ว ให้แจ้งเตือนว่าห้ามกดย้ำ
+                    // ✅ ตรวจสอบวัตถุดิบก่อน
+                    const ingredientCheck = await checkIngredientsAvailability(data.orderItems);
+                    if (!ingredientCheck.success) {
                         await client.replyMessage(event.replyToken, {
                             type: "text",
-                            text: "❌ คำสั่งซื้อนี้ได้รับการยืนยันแล้ว กรุณาส่งที่อยู่ของคุณ"
+                            text: ingredientCheck.message
                         });
                         return;
                     }
-        
-                    // ✅ บันทึก Order ลงฐานข้อมูล (แต่ยังไม่มีที่อยู่)
+            
+                    // ✅ บันทึก Order ลงฐานข้อมูล
                     const [orderResult] = await db.query(
                         "INSERT INTO `Order` (Customer_ID, Total_Amount, Customer_Address, Status) VALUES (?, ?, NULL, 'Awaiting Address')",
                         [data.customerId, data.totalAmount]
                     );
                     const orderId = orderResult.insertId;
-        
+            
                     // ✅ บันทึก Order Items
                     for (let item of data.orderItems) {
                         await db.query(
@@ -260,18 +260,21 @@ app.post("/webhook", async (req, res) => {
                             [orderId, item.product_id, item.quantity, item.subtotal]
                         );
                     }
-        
-                    // ✅ ลบปุ่มและส่งข้อความใหม่
+            
+                    // ✅ หักสต็อกวัตถุดิบ
+                    await deductIngredientsFromStock(data.orderItems);
+            
+                    // ✅ แจ้งลูกค้าให้ส่งที่อยู่
                     await client.replyMessage(event.replyToken, {
                         type: "text",
                         text: "✅ คำสั่งซื้อของคุณได้รับการยืนยันแล้ว!\n📍 กรุณาส่งที่อยู่สำหรับจัดส่งสินค้าของคุณ"
                     });
-        
+            
                 } catch (error) {
                     console.error("❌ Error saving order:", error);
                     await client.replyMessage(event.replyToken, { type: "text", text: "เกิดข้อผิดพลาด กรุณาลองใหม่" });
                 }
-            } 
+            }
             else if (data.action === "cancel_order") {
                 // ✅ ส่งข้อความใหม่แทนปุ่ม
                 await client.replyMessage(event.replyToken, {
