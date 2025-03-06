@@ -150,29 +150,62 @@ exports.deductIngredientsFromStock = async (orderItems) => {
           [item.product_id]
       );
 
-      // console.log(" ค่าที่ได้จาก Database (Ingredients):", product[0].Ingredients); // ✅ Debug
+      let ingredients = Array.isArray(product[0].Ingredients)
+          ? product[0].Ingredients
+          : JSON.parse(product[0].Ingredients || "[]");
 
-      let ingredients = [];
-
-      // ✅ ตรวจสอบว่า Ingredients เป็น JSON String หรือ Object
-      if (typeof product[0].Ingredients === "string") {
-          try {
-              ingredients = JSON.parse(product[0].Ingredients); // ✅ แปลงเป็น JSON ถ้าเป็น String
-          } catch (error) {
-              console.error("🚨 JSON Parse Error (Ingredients):", error);
-              return { success: false, message: "❌ ข้อมูล Ingredients ไม่ถูกต้อง" };
-          }
-      } else if (typeof product[0].Ingredients === "object" && product[0].Ingredients !== null) {
-          ingredients = product[0].Ingredients; // ✅ ถ้าเป็น Object อยู่แล้ว ใช้ได้เลย
-      } else {
-          ingredients = []; // ✅ ถ้าไม่มีข้อมูล ให้เป็น Array ว่าง
-      }
+      console.log("🔎 รายการวัตถุดิบที่ต้องใช้:", ingredients);
 
       for (let ing of ingredients) {
-          await db.query(
-              "UPDATE Ingredient SET Quantity = Quantity - ? WHERE Ingredient_ID = ?", 
-              [ing.quantity * item.quantity, ing.id]
+          let quantityNeeded = Number(ing.quantity) * item.quantity;
+
+          const [ingredientData] = await db.query(
+              "SELECT Ingredient_ID FROM Ingredient WHERE Ingredient_Name = ?", 
+              [ing.name]
           );
+
+          if (ingredientData.length === 0) {
+              console.error(`❌ ไม่พบวัตถุดิบ ${ing.name} ในฐานข้อมูล`);
+              continue;
+          }
+
+          let ingredientId = ingredientData[0].Ingredient_ID;
+
+          let [batches] = await db.query(
+              "SELECT * FROM Ingredient_Item WHERE Ingredient_ID = ? ORDER BY Updated_at ASC", 
+              [ingredientId]
+          );
+
+          console.log(`📢 ล็อตวัตถุดิบ ${ing.name} ที่เจอ:`, batches);
+
+          for (let batch of batches) {
+              if (quantityNeeded <= 0) break;
+
+              let deduction = Math.min(Number(batch.Quantity), quantityNeeded);
+              await db.query(
+                  "UPDATE Ingredient_Item SET Quantity = Quantity - ? WHERE Batch_code = ?", 
+                  [deduction, batch.Batch_code]
+              );
+
+              quantityNeeded -= deduction;
+          }
+
+          if (quantityNeeded > 0) {
+              console.error(`❌ วัตถุดิบ ${ing.name} ไม่เพียงพอ ต้องการ ${quantityNeeded} เพิ่ม`);
+          }
+
+          // ✅ อัปเดต Quantity ใน Ingredient ให้ตรงกับผลรวมของ Ingredient_Item
+          await db.query(
+              "UPDATE Ingredient SET Quantity = (SELECT COALESCE(SUM(Quantity), 0) FROM Ingredient_Item WHERE Ingredient_ID = ?) WHERE Ingredient_ID = ?",
+              [ingredientId, ingredientId]
+          );
+
+          console.log(`✅ อัปเดตปริมาณรวมของ ${ing.name} แล้ว`);
       }
   }
 };
+
+
+
+
+

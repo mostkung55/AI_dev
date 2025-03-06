@@ -16,15 +16,18 @@ import {
 } from "@mui/material";
 import { Delete, Edit, Add } from "@mui/icons-material";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
+import ListAltIcon from "@mui/icons-material/ListAlt"; // ✅ นำเข้าไอคอน
+
 
 const ManageIngre = () => {
   const [ingredients, setIngredients] = useState([]);
   const [ingreName, setIngreName] = useState("");
   const [ingreUnit, setIngreUnit] = useState("");
   const [open, setOpen] = useState(false);
-  const [editId, setEditId] = useState(null);
-  const [openEdit, setOpenEdit] = useState(false);
   const [lowStockThreshold, setLowStockThreshold] = useState("");
+  const [expDate, setExpDate] = useState(""); 
+  const navigate = useNavigate();
 
 
   useEffect(() => {
@@ -47,53 +50,31 @@ const ManageIngre = () => {
 };
 
 
-  const handleAddIngredient = async () => {
-    if (!ingreName || !ingreUnit) {
+const handleAddIngredient = async () => {
+  if (!ingreName || !ingreUnit || !expDate) {  // ⏳ เพิ่มเงื่อนไขให้ต้องกรอก EXP_date
       alert("กรุณากรอกข้อมูลให้ครบ");
       return;
-    }
+  }
 
-    try {
+  try {
       await axios.post("http://localhost:3000/api/ingredient", {
-        Ingredient_Name: ingreName,  
-        Quantity: parseInt(ingreUnit, 10),
-        Low_stock_threshold: parseInt(lowStockThreshold, 10) || 5, // ✅ กำหนดค่า Default เป็น 5 ถ้าผู้ใช้ไม่ใส่ค่า
-    });
-    
+          Ingredient_Name: ingreName,  
+          Quantity: parseInt(ingreUnit, 10),
+          Low_stock_threshold: parseInt(lowStockThreshold, 10) || 5, 
+          EXP_date: expDate, // ⏳ ส่งค่า EXP_date ไปยัง Backend
+      });
 
       setIngreName("");
       setIngreUnit("");
+      setExpDate("");  // ⏳ รีเซ็ตค่า EXP_date หลังจากเพิ่มข้อมูล
       setOpen(false);
       loadIngredients();
-    } catch (error) {
+  } catch (error) {
       console.error("เพิ่มวัตถุดิบไม่สำเร็จ", error);
-    }
-  };
-
-  const handleEditIngredient = async () => {
-    if (!ingreName || !ingreUnit) {
-        alert("กรุณากรอกข้อมูลให้ครบ");
-        return;
-    }
-
-    try {
-        await axios.put(`http://localhost:3000/api/ingredient/${editId}`, {
-            Ingredient_Name: ingreName,  
-            Quantity: parseInt(ingreUnit, 10),
-            Low_stock_threshold: parseInt(lowStockThreshold, 10),
-        });
-
-        setIngreName("");
-        setIngreUnit("");
-        setLowStockThreshold("");
-        setEditId(null);
-        setOpenEdit(false);
-
-        loadIngredients(); // ✅ โหลดข้อมูลใหม่ทันทีหลังจากอัปเดต Stock
-    } catch (error) {
-        console.error("🚨 แก้ไขวัตถุดิบไม่สำเร็จ:", error);
-    }
+  }
 };
+
+  
 
 
   const handleDeleteIngredient = async (id) => {
@@ -107,13 +88,8 @@ const ManageIngre = () => {
     }
   };
 
-  const handleEdit = (ingredient) => {
-    setIngreName(ingredient.Ingredient_Name);
-    setIngreUnit(ingredient.Quantity);
-    setEditId(ingredient.Ingredient_ID);
-    setLowStockThreshold(ingredient.Low_stock_threshold || 5); // ✅ ถ้าไม่มีค่าให้ใช้ Default = 5
-    setOpenEdit(true);
-};
+
+
 
 
   return (
@@ -144,6 +120,7 @@ const ManageIngre = () => {
                   <TableCell>{index + 1}.</TableCell>
                   <TableCell>{ingre.Ingredient_Name}</TableCell>
                   <TableCell align="center">{ingre.Quantity}</TableCell>
+                  
                   <TableCell>
                         {ingre.isLowStock ? (
                             <Typography color="error">⚠️ Low Stock (ต่ำกว่า {ingre.Low_stock_threshold})</Typography>
@@ -151,11 +128,15 @@ const ManageIngre = () => {
                             <Typography color="green" align="center">✅ Ready to Use</Typography>
                         )}
                     </TableCell>
-
+                    
                   <TableCell align="center">
-                    <IconButton color="warning" onClick={() => handleEdit(ingre)}>
-                      <Edit />
+                  <IconButton 
+                        color="primary" 
+                        onClick={() => navigate(`/ingredient_item?ingredient_id=${ingre.Ingredient_ID}`)}
+                    >
+                        <ListAltIcon />  
                     </IconButton>
+                    
                     <IconButton color="error" onClick={() => handleDeleteIngredient(ingre.Ingredient_ID)}>
                       <Delete />
                     </IconButton>
@@ -182,7 +163,6 @@ const ManageIngre = () => {
         onClick={() => {
           setIngreName("");
           setIngreUnit("");
-          setEditId(null);
           setOpen(true);
         }}
       >
@@ -214,6 +194,18 @@ const ManageIngre = () => {
             margin="normal"
             size="small"
           />
+          <TextField
+            label="Expiration Date"
+            type="date"
+            value={expDate}
+            onChange={(e) => setExpDate(e.target.value)}
+            fullWidth
+            margin="normal"
+            size="small"
+            InputLabelProps={{
+                shrink: true,
+            }}
+        />
           
           <Button variant="contained" color="primary" onClick={handleAddIngredient} fullWidth>
             ADD INGREDIENT
@@ -221,41 +213,7 @@ const ManageIngre = () => {
         </Box>
       </Modal>
 
-      {/* Modal แก้ไข */}
-      <Modal open={openEdit} onClose={() => setOpenEdit(false)}>
-        <Box className="modal-box">
-          <Typography variant="h6" gutterBottom>
-            Edit Ingredient
-          </Typography>
-          <TextField
-            label="Name"
-            value={ingreName}
-            onChange={(e) => setIngreName(e.target.value)}
-            fullWidth
-            margin="normal"
-            size="small"
-          />
-          <TextField
-            label="Quatity"
-            value={ingreUnit}
-            onChange={(e) => setIngreUnit(e.target.value)}
-            fullWidth
-            margin="normal"
-            size="small"
-          />
-          <TextField
-                label="Low Stock Threshold"
-                value={lowStockThreshold}
-                onChange={(e) => setLowStockThreshold(e.target.value)}
-                fullWidth
-                margin="normal"
-                size="small"
-            />
-          <Button variant="contained" color="secondary" onClick={handleEditIngredient} fullWidth>
-            SAVE CHANGES
-          </Button>
-        </Box>
-      </Modal>
+     
     </div>
   );
 };

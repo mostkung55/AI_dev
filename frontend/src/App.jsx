@@ -8,24 +8,11 @@ import ManageIngre from './components/ManageIngre';
 import ManageOrder from './components/ManageOrder';
 import ManageProduct from './components/ManageProduct';
 import OrderItem from "./components/Order_item";
+import IngredientItem from './components/Ingredient_item';
 import { Button } from '@mui/material';
 
 
 function App() {
-  const test = async () => {
-    try {
-      axios.get('http://localhost:3000/api/products')
-        .then(response => {
-            console.log(response.data);
-        })
-        .catch(error => {
-            console.error('There was an error!', error);
-        });
-    } catch (err){
-      console.log(err)
-    }
-  }
-
   return (
     <>
       <Router>
@@ -36,8 +23,11 @@ function App() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/Product" element={<ManageProduct />} />
             <Route path="/Ingre" element={<ManageIngre />} />
+            <Route path="/ingredient_item" element={<IngredientItem />} />
+
             <Route path="/Order" element={<ManageOrder />} />
             <Route path="/Order_item" element={<OrderItem />} />
+            
           </Routes>
         </div>
       </div>

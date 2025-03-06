@@ -7,23 +7,52 @@ const axios = require("axios");
 
 exports.createIngredient = async (req, res) => {
     try {
-        console.log("📢 ข้อมูลที่ได้รับจาก React:", req.body); // ✅ Debug
+        console.log("📢 ข้อมูลที่ได้รับจาก React:", req.body);
 
-        const { Ingredient_Name, Quantity, Low_stock_threshold } = req.body;
+        const { Ingredient_Name, Quantity, Low_stock_threshold, EXP_date } = req.body;
 
-        if (!Ingredient_Name || Quantity === undefined || Low_stock_threshold === undefined) {
+        if (!Ingredient_Name || Quantity === undefined || Low_stock_threshold === undefined || !EXP_date) {
             return res.status(400).json({ message: "กรุณากรอกข้อมูลให้ครบถ้วน" });
         }
 
-        const sql = "INSERT INTO Ingredient (Ingredient_Name, Quantity, Low_stock_threshold) VALUES (?, ?, ?)";
-        const [result] = await db.query(sql, [Ingredient_Name, Quantity, Low_stock_threshold]);
+        // ✅ ตรวจสอบว่า Ingredient มีอยู่แล้วหรือไม่
+        const [existingIngredient] = await db.query(
+            "SELECT Ingredient_ID, Quantity FROM Ingredient WHERE Ingredient_Name = ?",
+            [Ingredient_Name]
+        );
 
-        res.status(201).json({ message: "เพิ่มวัตถุดิบสำเร็จ!", ingredientId: result.insertId });
+        let ingredientId;
+        if (existingIngredient.length > 0) {
+            // 🟢 ถ้ามีอยู่แล้ว บวก Quantity เข้าไป (ใช้ Number() แปลงค่าก่อน)
+            ingredientId = existingIngredient[0].Ingredient_ID;
+            const newTotalQuantity = Number(existingIngredient[0].Quantity) + Number(Quantity);
+
+            await db.query(
+                "UPDATE Ingredient SET Quantity = ? WHERE Ingredient_ID = ?",
+                [newTotalQuantity, ingredientId]
+            );
+        } else {
+            // 🔵 ถ้ายังไม่มี ให้เพิ่มวัตถุดิบใหม่เข้า Ingredient
+            const sqlInsertIngredient = "INSERT INTO Ingredient (Ingredient_Name, Quantity, Low_stock_threshold) VALUES (?, ?, ?)";
+            const [result] = await db.query(sqlInsertIngredient, [Ingredient_Name, Quantity, Low_stock_threshold]);
+            ingredientId = result.insertId;
+        }
+
+        // ✅ เพิ่มล็อตใหม่ใน Ingredient_Item
+        const batchCode = `BATCH-${ingredientId}-${Date.now()}`;
+        const sqlInsertBatch = "INSERT INTO Ingredient_Item (Ingredient_ID, Batch_code, Quantity, EXP_date, Updated_at) VALUES (?, ?, ?, ?, NOW())";
+        await db.query(sqlInsertBatch, [ingredientId, batchCode, Quantity, EXP_date]);
+
+        res.status(201).json({ message: "เพิ่มวัตถุดิบสำเร็จ!", ingredientId });
+
     } catch (error) {
         console.error("🚨 เพิ่มวัตถุดิบไม่สำเร็จ:", error);
         res.status(500).json({ message: "เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์" });
     }
 };
+
+
+
 
 exports.getIngredients = async (req, res) => {
     try {
@@ -47,31 +76,19 @@ exports.getIngredients = async (req, res) => {
 };
 
 
-exports.updateIngredient = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { Ingredient_Name, Quantity, Low_stock_threshold } = req.body;
 
-        if (!Ingredient_Name || Quantity === undefined || Low_stock_threshold === undefined) {
-            return res.status(400).json({ message: "กรุณากรอกข้อมูลให้ครบ" });
-        }
-
-        const sql = "UPDATE Ingredient SET Ingredient_Name = ?, Quantity = ?, Low_stock_threshold = ? WHERE Ingredient_ID = ?";
-        await db.query(sql, [Ingredient_Name, Quantity, Low_stock_threshold, id]);
-
-        res.status(200).json({ message: "อัปเดตวัตถุดิบสำเร็จ!" });
-    } catch (error) {
-        console.error("🚨 อัปเดตวัตถุดิบไม่สำเร็จ:", error);
-        res.status(500).json({ message: "เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์" });
-    }
-};
 
 exports.deleteIngredient = async (req, res) => {
     try {
         const { id } = req.params;
 
-        const sql = "DELETE FROM Ingredient WHERE Ingredient_ID = ?";
-        await db.query(sql, [id]);
+        // ✅ ลบจาก Ingredient_Item ก่อน
+        const sqlDeleteItems = "DELETE FROM Ingredient_Item WHERE Ingredient_ID = ?";
+        await db.query(sqlDeleteItems, [id]);
+
+        // ✅ ลบจาก Ingredient
+        const sqlDeleteIngredient = "DELETE FROM Ingredient WHERE Ingredient_ID = ?";
+        await db.query(sqlDeleteIngredient, [id]);
 
         res.status(200).json({ message: "ลบวัตถุดิบสำเร็จ!" });
     } catch (error) {
@@ -79,3 +96,5 @@ exports.deleteIngredient = async (req, res) => {
         res.status(500).json({ message: "เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์" });
     }
 };
+
+

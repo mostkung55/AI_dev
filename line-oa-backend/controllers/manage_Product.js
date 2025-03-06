@@ -159,7 +159,7 @@ exports.deleteProduct = async (req, res) => {
 
 exports.generateProductMenu = async () => {
     try {
-        const [products] = await db.query("SELECT Product_Name, Price, Description, Product_image FROM Product LIMIT 5");
+        const [products] = await db.query("SELECT Product_Name, Price, Description, Product_image FROM Product LIMIT 6");
 
         if (products.length === 0) {
             return null; // 🔹 ถ้าไม่มีสินค้าให้คืนค่า `null`
@@ -175,7 +175,7 @@ exports.generateProductMenu = async () => {
                     type: "bubble",
                     hero: {
                         type: "image",
-                        url: `https://b5cb-58-8-92-42.ngrok-free.app${product.Product_image}`,
+                        url: `https://4d8d-58-8-92-42.ngrok-free.app${product.Product_image}`,
                         size: "full",
                         aspectRatio: "20:13",
                         aspectMode: "cover"

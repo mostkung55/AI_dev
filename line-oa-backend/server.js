@@ -10,6 +10,7 @@ const cron = require("node-cron");
 const { sendProductsToLine } = require("./controllers/manage_Product");
 const route_order = require('./routes/route_order');
 const route_orderitem = require('./routes/route_orderitems');
+const route_ingredientitems = require('./routes/route_ingredientitems');
 const route_ingredient = require('./routes/route_ingredient');
 const { checkIngredientsAvailability, deductIngredientsFromStock } = require("./controllers/manage_Order");
 
@@ -21,6 +22,7 @@ EventEmitter.defaultMaxListeners = 20; // เพิ่ม Limit ของ EventE
 
 
 
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors());
@@ -29,7 +31,7 @@ app.use("/uploads", express.static("uploads"));
 app.use("/api/orders", route_order);
 app.use("/api/order_items",route_orderitem);
 app.use("/api/ingredient",route_ingredient);
-
+app.use("/api/ingredientItems",route_ingredientitems);
 
 
 const config = {
