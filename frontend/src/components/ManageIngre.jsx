@@ -131,11 +131,11 @@ const handleAddIngredient = async () => {
                     
                   <TableCell align="center">
                   <IconButton 
-                        color="primary" 
-                        onClick={() => navigate(`/ingredient_item?ingredient_id=${ingre.Ingredient_ID}`)}
-                    >
-                        <ListAltIcon />  
-                    </IconButton>
+                      color="primary" 
+                      onClick={() => navigate(`/ingredient_item?ingredient_id=${ingre.Ingredient_ID}&ingredient_name=${encodeURIComponent(ingre.Ingredient_Name)}`)}
+                  >
+                      <ListAltIcon />  
+                  </IconButton>
                     
                     <IconButton color="error" onClick={() => handleDeleteIngredient(ingre.Ingredient_ID)}>
                       <Delete />

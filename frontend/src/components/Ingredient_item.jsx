@@ -15,10 +15,11 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import axios from "axios";
 import moment from "moment-timezone";
 const IngredientItem = () => {
-  const location = useLocation();
-  const queryParams = new URLSearchParams(location.search);
-  const ingredientId = queryParams.get("ingredient_id"); // ✅ ดึงค่า `ingredient_id` จาก URL
-  const navigate = useNavigate();
+    const location = useLocation(); // ✅ ใช้เพื่อดึงข้อมูลจาก URL
+    const queryParams = new URLSearchParams(location.search);
+    const ingredientId = queryParams.get("ingredient_id"); 
+    const ingredientName = queryParams.get("ingredient_name");
+    const navigate = useNavigate();
 
   const [ingredientItems, setIngredientItems] = useState([]);
   const formatDateToThaiTime = (dateString) => {
@@ -57,8 +58,9 @@ const IngredientItem = () => {
         <ArrowBackIcon />
       </IconButton>
 
+
       <Typography variant="h5" align="center" gutterBottom>
-        Ingredient Items (Batch)
+        Ingredient Items - {ingredientName || "Unknown"}
       </Typography>
 
       <TableContainer component={Paper}>

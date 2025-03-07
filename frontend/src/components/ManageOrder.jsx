@@ -70,7 +70,7 @@ const ManageOrder = () => {
                 <TableCell>{order.Order_ID}.</TableCell>
                 <TableCell>{order.Customer_ID}</TableCell>
                 <TableCell>{order.Customer_Address}</TableCell>
-                <TableCell>{new Date(order.Created_at).toLocaleString()}</TableCell>
+                <TableCell >{new Date(order.Created_at).toLocaleString("th-TH")}</TableCell>
                 <TableCell>{order.Status}</TableCell>
                 <TableCell>{order.Total_Amount} บาท</TableCell>
                 <TableCell>

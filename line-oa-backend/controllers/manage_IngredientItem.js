@@ -18,6 +18,7 @@ exports.getIngredientItems = async (req, res) => {
             return res.status(400).json({ message: "กรุณาระบุ ingredient_id" });
         }
 
+    
         const sql = `
             SELECT Ingredient_Item.*, 
                    DATE_FORMAT(CONVERT_TZ(Updated_at, '+00:00', '+07:00'), '%d/%m/%Y %H:%i:%s') AS Updated_at_local
