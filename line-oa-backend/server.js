@@ -16,6 +16,8 @@ const { checkIngredientsAvailability, deductIngredientsFromStock } = require("./
 
 const path = require("path");
 const { exec } = require("child_process");
+const FormData = require("form-data");
+const fs = require("fs");
 
 const EventEmitter = require('events');
 EventEmitter.defaultMaxListeners = 20; // เพิ่ม Limit ของ EventEmitter
@@ -224,7 +226,35 @@ app.post("/webhook", async (req, res) => {
             } catch (error) {
                 console.error("🚨 Error processing order:", error);
             }
-        } 
+        }
+        else if (event.type === 'message' && event.message.type === "image") {
+            const imageId = event.message.id;
+
+            // console.log("🖼️ Image ID ที่ส่งไปโหลด:", imageId);
+            if (!imageId) {
+                console.error("❌ Image ID เป็นค่าว่าง! ตรวจสอบการดึงค่าจาก LINE API");
+                return;
+            }
+
+
+                const [latestOrder] = await db.query(
+                    "SELECT Order_ID FROM `Order` WHERE Customer_ID = ? ORDER BY Order_ID DESC LIMIT 1",
+                    [event.source.userId]
+                );
+
+                if (latestOrder.length === 0) {
+                    return client.replyMessage(event.replyToken, { type: "text", text: "⛔ ไม่พบคำสั่งซื้อของคุณ" });
+                }
+
+                const orderId = latestOrder[0].Order_ID;
+
+                const resultMessage = await verifySlip(imageId, orderId, event.source.userId);
+                
+                await client.replyMessage(event.replyToken, {
+                    type: "text",
+                    text: resultMessage
+                });
+        }
         
         // ✅ ตรวจจับเมื่อมีการกดปุ่ม Confirm หรือ Cancel
         else if (event.type === "postback") {
@@ -284,36 +314,130 @@ app.post("/webhook", async (req, res) => {
                     type: "text",
                     text: "❌ คำสั่งซื้อของคุณถูกยกเลิกเรียบร้อยแล้ว"
                 });
+            }else if (data.action === "payment") {
+                let paymentText = data.method === "cash" ? "💵 เงินสด" : "💳 โอนเงิน";
+
+                const [order] = await db.query("SELECT Total_Amount FROM `Order` WHERE Order_ID = ?", [data.orderId]);
+            
+                const amount = order[0].Total_Amount;
+                await db.query(
+                    "INSERT INTO `Payment` (Order_ID, Amount, Method, Payment_Date, Status) VALUES (?, ?, ?, NOW(), 'Pending') " +
+                    "ON DUPLICATE KEY UPDATE Method = VALUES(Method), Status = 'Pending'",
+                    [data.orderId, amount, data.method]
+                );
+                   
+                if (data.method === "transfer") {
+                    const accountDetails = `🏦 รายละเอียดบัญชีสำหรับโอนเงิน:\n\n` +
+                                           `ธนาคาร: กสิกรไทย (KBank)\n` +
+                                           `ชื่อบัญชี: นาย พิสิษฐ์ ศรีโมอ่อน\n` +
+                                           `เลขที่บัญชี: 142-1-36089-4\n\n` +
+                                           `💰 ยอดที่ต้องชำระ: ${amount} บาท\n\n` +
+                                           `📌 กรุณาโอนเงินและส่งสลิปยืนยันการชำระเงิน`;
+            
+                    await client.replyMessage(event.replyToken, {
+                        type: "text",
+                        text: accountDetails
+                    });
+            
+                } else if (data.method === "cash" ) {
+                    await client.replyMessage(event.replyToken, {
+                        type: "text",
+                        text: `💰 ยอดที่ต้องชำระ: ${amount} บาท\n\n📌 โปรดเตรียมเงินให้พร้อม`
+                    });
+
+                } else {
+                    await client.replyMessage(event.replyToken, {
+                        type: "text",
+                        text: `✅ คุณเลือกชำระเงินด้วย: ${paymentText}`
+                    });
+                }
             }
+            
         }
     }
 
     res.sendStatus(200);
 });
 
+const downloadImage = async (imageId) => {
+    const url = `https://api-data.line.me/v2/bot/message/${imageId}/content`;
+    const headers = { Authorization: `Bearer ${config.channelAccessToken}` };
+
+    try {
+        console.log("📥 Downloading image from:", url);
+        // console.log("📥 Sending request with headers:", headers);
+        const response = await axios.get(url, { headers, responseType: "arraybuffer" });
+        
+
+        const tmpDir = path.join(__dirname, "tmp");
+        if (!fs.existsSync(tmpDir)) {
+            fs.mkdirSync(tmpDir, { recursive: true });
+        }
+
+        const imagePath = path.join(tmpDir, `slip-${imageId}.jpg`);
+        fs.writeFileSync(imagePath, response.data);  
+
+        return imagePath;
+    } catch (error) {
+        console.error("❌ Error downloading image:", error.response ? error.response.data.toString() : error.message);
+        return null;
+    }
+};
+
+
+// ฟังก์ชันตรวจสอบสลิป
+const verifySlip = async (imageId, orderId, customerId) => {
+    try {
+        const imagePath = await downloadImage(imageId);
+        if (!imagePath) {
+            return "❌ ไม่สามารถดาวน์โหลดรูปภาพได้ กรุณาส่งใหม่";
+        }
+
+        const FormData = require("form-data");
+        const formData = new FormData();
+        formData.append("files", fs.createReadStream(imagePath));
+        formData.append("log", "true");
+
+        const SLIPOK_BRANCH_ID = "40472";
+        const SLIPOK_API_KEY = "SLIPOK40XQRAA";
+
+        const response = await axios.post(
+            `https://api.slipok.com/api/line/apikey/${SLIPOK_BRANCH_ID}`,
+            formData,
+            {
+                headers: {
+                    "x-authorization": SLIPOK_API_KEY,
+                    ...formData.getHeaders()  
+                }
+            }
+        );
+
+        //ลบไฟล์หลังส่งเสร็จ
+        fs.unlinkSync(imagePath);
+
+        console.log("✅ SlipOK Response:", response.data);
+
+        if (response.data.success) {
+            await db.query(
+                "UPDATE Payment SET Status = 'Confirmed' WHERE Order_ID = ?",
+                [orderId]
+            );
+
+            return "✅ สลิปถูกต้องและได้รับการยืนยัน";
+        } else {
+            return "❌ สลิปไม่ถูกต้อง กรุณาส่งใหม่";
+        }
+    } catch (error) {
+        console.error("❌ Error verifying slip:", error.response ? error.response.data : error.message);
+        return `❌ มีข้อผิดพลาดในการตรวจสอบสลิป`;
+    }
+};
 
 
 
 
 
 
-// const sendProductMenuToLine = async () => {
-//     try {
-//         const flexMessage = await generateProductMenu();
-//         if (!flexMessage) {
-//             console.log("❌ ไม่มีสินค้าในระบบ");
-//             return;
-//         }
-
-
-//         const [recipients] = await db.query("SELECT Customer_ID FROM Customer"); 
-//         await client.pushMessage(recipients, flexMessage);
-
-//         console.log("✅ ส่งเมนูสินค้าไปยัง LINE OA สำเร็จ!");
-//     } catch (error) {
-//         console.error("🚨 ไม่สามารถส่งเมนูไปยัง LINE OA:", error);
-//     }
-// };
 
 
 cron.schedule("0 12 * * *", async () => {

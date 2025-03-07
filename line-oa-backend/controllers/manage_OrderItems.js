@@ -40,7 +40,81 @@ exports.getItem = async (req, res) => {
         res.status(500).json({ message: "เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์" });
     }
 };
-const notifyCustomer = async (customerId, status) => {
+// 📌 ฟังก์ชันส่งแจ้งเตือนการชำระเงินไปยังลูกค้า
+exports.sendNotification = async (orderId) => {
+    try {
+        // 🔥 ดึงข้อมูลลูกค้า (เช่น LINE User ID) จากฐานข้อมูล
+        const [order] = await db.query("SELECT Customer_ID, status FROM `Order` WHERE Order_ID = ?", [orderId]);
+        
+        if (order.length === 0) {
+            console.error(`❌ Order ID ${orderId} not found!`);
+            return;
+        }
+
+        const customerId = order[0].Customer_ID; 
+
+        const message = {
+            to: customerId,
+            messages: [
+                {
+                    type: "flex",
+                    altText: "เลือกวิธีการชำระเงิน",
+                    contents: {
+                        type: "bubble",
+                        body: {
+                            type: "box",
+                            layout: "vertical",
+                            contents: [
+                                { type: "text", text: "🚚 สินค้าส่งเสร็จเรียบร้อย!", weight: "bold", size: "xl" },
+                                { type: "text", text: "กรุณาเลือกวิธีการชำระเงิน", margin: "md" }
+                            ]
+                        },
+                        footer: {
+                            type: "box",
+                            layout: "horizontal",
+                            spacing: "sm",
+                            contents: [
+                                {
+                                    type: "button",
+                                    style: "primary",
+                                    color: "#1DB446",
+                                    action: {
+                                        type: "postback",
+                                        label: "💵 เงินสด",
+                                        data: JSON.stringify({ action: "payment", method: "cash", customerId, orderId })
+                                    }
+                                },
+                                {
+                                    type: "button",
+                                    style: "primary",
+                                    color: "#1DA1F2",
+                                    action: {
+                                        type: "postback",
+                                        label: "💳 โอนเงิน",
+                                        data: JSON.stringify({ action: "payment", method: "transfer", customerId, orderId })
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            ]
+        };
+
+        await axios.post("https://api.line.me/v2/bot/message/push", message, {
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${config.channelAccessToken}`
+            }
+        });
+
+        console.log(`✅ Notification sent to Customer ${customerId} (LINE ID: ${customerId})`);
+    } catch (err) {
+        console.error("❌ Error sending LINE notification:", err);
+    }
+};
+
+const notifyCustomer = async (customerId, status, orderId) => {
     if (!customerId) {
         console.error("❌ ไม่มี Customer_ID สำหรับแจ้งเตือนลูกค้า");
         return;
@@ -57,7 +131,8 @@ const notifyCustomer = async (customerId, status) => {
             message = "🚚 คำสั่งซื้อของคุณกำลังถูกจัดส่ง!";
             break;
         case "Completed":
-            message = "🎉 คำสั่งซื้อของคุณถูกจัดส่งสำเร็จแล้ว! ขอบคุณที่ใช้บริการครับ 😊";
+            // ✅ เพิ่มการแจ้งเตือนช่องทางการชำระเงิน
+            await exports.sendNotification(orderId);
             break;
         case "Paid":
             message = "💰 คำสั่งซื้อของคุณถูกชำระเงินเรียบร้อยแล้ว!";
@@ -73,6 +148,7 @@ const notifyCustomer = async (customerId, status) => {
         console.error("❌ Error sending notification to customer:", error);
     }
 };
+
 
 // 📌 PUT: อัปเดตสถานะของสินค้าใน Order Item และอัปเดตสถานะ Order
 exports.updateItemStatus = async (req, res) => {
@@ -124,8 +200,9 @@ exports.updateItemStatus = async (req, res) => {
 
         // ✅ ส่งแจ้งเตือนลูกค้าเมื่อ **ทุก OrderItem เปลี่ยนสถานะเดียวกัน**
         if (statuses.every(s => s === newOrderStatus)) {
-            await notifyCustomer(customerId, newOrderStatus);
+            await notifyCustomer(customerId, newOrderStatus, orderId); // ✅ เพิ่ม orderId
         }
+
 
         res.status(200).json({ message: `✅ Order Item ${orderItemId} updated to ${status}, Order ${orderId} updated to ${newOrderStatus}` });
     } catch (err) {
@@ -133,6 +210,7 @@ exports.updateItemStatus = async (req, res) => {
         res.status(500).json({ error: "Failed to update item status" });
     }
 };
+
 
 
 
@@ -152,10 +230,18 @@ exports.updateOrderStatus = async (req, res) => {
         // ✅ อัปเดต Status ของ Order
         await db.query("UPDATE `Order` SET Status = ? WHERE Order_ID = ?", [status, orderId]);
 
+        // ✅ เรียกฟังก์ชันแจ้งเตือนลูกค้าเมื่อสถานะเป็น "Completed"
+        if (status === "Completed") {
+            console.log("📌 Order Completed! กำลังแจ้งเตือนลูกค้า...");
+            await exports.sendNotification(orderId);
+        }
+
         res.status(200).json({ message: `✅ อัปเดตสถานะ Order ${orderId} เป็น ${status} สำเร็จ!` });
     } catch (error) {
         console.error("🚨 Error updating order status:", error);
         res.status(500).json({ message: "เกิดข้อผิดพลาดในการอัปเดตสถานะของ Order" });
     }
 };
+
+
 
