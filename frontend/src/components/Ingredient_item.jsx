@@ -70,6 +70,7 @@ const IngredientItem = () => {
               <TableCell>No.</TableCell>
               <TableCell>Batch Code</TableCell>
               <TableCell align="center">Quantity</TableCell>
+              <TableCell align="center">Price</TableCell> 
               <TableCell align="center">Expiration Date</TableCell>
               <TableCell align="center">Last Updated</TableCell> {/* ✅ แสดง Updated_at */}
             </TableRow>
@@ -81,6 +82,7 @@ const IngredientItem = () => {
                         <TableCell>{index + 1}</TableCell> {/* ✅ ใช้ index แทน "N/A" */}
                         <TableCell>{item.Batch_code ?? "N/A"}</TableCell>
                         <TableCell align="center">{item.Quantity ?? 0}</TableCell>
+                        <TableCell align="center">{item.Price?.toFixed(2) ?? "N/A"}</TableCell> 
                         <TableCell align="center">{new Date(item.EXP_date).toLocaleDateString("th-TH")}</TableCell>
                         <TableCell align="center">{new Date(item.Updated_at).toLocaleString("th-TH")}</TableCell>
                     </TableRow>

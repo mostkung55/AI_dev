@@ -17,6 +17,7 @@
     "axios": "^1.7.9",
     "browser-image-compression": "^2.0.2",
     "compressorjs": "^1.2.1",
+    "dayjs": "^1.11.13",
     "lucide-react": "^0.475.0",
     "moment-timezone": "^0.5.47",
     "react": "^19.0.0",

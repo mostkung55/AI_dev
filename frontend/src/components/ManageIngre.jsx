@@ -28,6 +28,7 @@ const ManageIngre = () => {
   const [lowStockThreshold, setLowStockThreshold] = useState("");
   const [expDate, setExpDate] = useState(""); 
   const navigate = useNavigate();
+  const [price, setPrice] = useState("");
 
 
   useEffect(() => {
@@ -62,6 +63,7 @@ const handleAddIngredient = async () => {
           Quantity: parseInt(ingreUnit, 10),
           Low_stock_threshold: parseInt(lowStockThreshold, 10) || 5, 
           EXP_date: expDate, // ⏳ ส่งค่า EXP_date ไปยัง Backend
+          Price: parseFloat(price), // ✅ ส่งข้อมูล Price ไป Backend
       });
 
       setIngreName("");
@@ -205,6 +207,15 @@ const handleAddIngredient = async () => {
             InputLabelProps={{
                 shrink: true,
             }}
+        />
+        <TextField
+            label="Price"
+            type="number"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            fullWidth
+            margin="normal"
+            size="small"
         />
           
           <Button variant="contained" color="primary" onClick={handleAddIngredient} fullWidth>

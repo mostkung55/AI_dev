@@ -42,7 +42,8 @@ const OrderItem = () => {
 
 
   return (
-    <div className="order-container"> 
+    <div className="order-container">
+      
       <Typography variant="h4" align="center" gutterBottom>
         🛒 Order Items
       </Typography>
@@ -88,6 +89,7 @@ const OrderItem = () => {
             )}
           </TableBody>
         </Table>
+        
       </TableContainer>
     </div>
   );

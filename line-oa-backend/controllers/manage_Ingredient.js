@@ -9,9 +9,9 @@ exports.createIngredient = async (req, res) => {
     try {
         console.log("📢 ข้อมูลที่ได้รับจาก React:", req.body);
 
-        const { Ingredient_Name, Quantity, Low_stock_threshold, EXP_date } = req.body;
+        const { Ingredient_Name, Quantity, Low_stock_threshold, EXP_date, Price } = req.body;
 
-        if (!Ingredient_Name || Quantity === undefined || Low_stock_threshold === undefined || !EXP_date) {
+        if (!Ingredient_Name || Quantity === undefined || Low_stock_threshold === undefined || !EXP_date || Price === undefined) {
             return res.status(400).json({ message: "กรุณากรอกข้อมูลให้ครบถ้วน" });
         }
 
@@ -23,7 +23,6 @@ exports.createIngredient = async (req, res) => {
 
         let ingredientId;
         if (existingIngredient.length > 0) {
-            // 🟢 ถ้ามีอยู่แล้ว บวก Quantity เข้าไป (ใช้ Number() แปลงค่าก่อน)
             ingredientId = existingIngredient[0].Ingredient_ID;
             const newTotalQuantity = Number(existingIngredient[0].Quantity) + Number(Quantity);
 
@@ -32,16 +31,15 @@ exports.createIngredient = async (req, res) => {
                 [newTotalQuantity, ingredientId]
             );
         } else {
-            // 🔵 ถ้ายังไม่มี ให้เพิ่มวัตถุดิบใหม่เข้า Ingredient
             const sqlInsertIngredient = "INSERT INTO Ingredient (Ingredient_Name, Quantity, Low_stock_threshold) VALUES (?, ?, ?)";
             const [result] = await db.query(sqlInsertIngredient, [Ingredient_Name, Quantity, Low_stock_threshold]);
             ingredientId = result.insertId;
         }
 
-        // ✅ เพิ่มล็อตใหม่ใน Ingredient_Item
+        // ✅ เพิ่มราคาใน Ingredient_Item
         const batchCode = `BATCH-${ingredientId}-${Date.now()}`;
-        const sqlInsertBatch = "INSERT INTO Ingredient_Item (Ingredient_ID, Batch_code, Quantity, EXP_date, Updated_at) VALUES (?, ?, ?, ?, NOW())";
-        await db.query(sqlInsertBatch, [ingredientId, batchCode, Quantity, EXP_date]);
+        const sqlInsertBatch = "INSERT INTO Ingredient_Item (Ingredient_ID, Batch_code, Quantity, EXP_date, Price, Updated_at) VALUES (?, ?, ?, ?, ?, NOW())";
+        await db.query(sqlInsertBatch, [ingredientId, batchCode, Quantity, EXP_date, Price]);
 
         res.status(201).json({ message: "เพิ่มวัตถุดิบสำเร็จ!", ingredientId });
 
@@ -54,17 +52,26 @@ exports.createIngredient = async (req, res) => {
 
 
 
+
 exports.getIngredients = async (req, res) => {
     try {
-        const sql = "SELECT Ingredient_ID, Ingredient_Name, Quantity, Low_stock_threshold FROM Ingredient";
+        const sql = `
+            SELECT 
+                i.Ingredient_ID, 
+                i.Ingredient_Name, 
+                i.Quantity, 
+                i.Low_stock_threshold,
+                (SELECT Price FROM Ingredient_Item WHERE Ingredient_ID = i.Ingredient_ID LIMIT 1) AS Price
+            FROM Ingredient i
+        `;
         const [ingredients] = await db.query(sql);
 
-        // ✅ แปลงค่าทุกตัวเป็น number เพื่อให้แน่ใจว่าคำนวณถูกต้อง
         const updatedIngredients = ingredients.map(ingre => ({
             ...ingre,
-            Quantity: Number(ingre.Quantity), // ✅ แปลงให้แน่ใจว่าเป็นตัวเลข
+            Quantity: Number(ingre.Quantity),
             Low_stock_threshold: Number(ingre.Low_stock_threshold),
             isLowStock: Number(ingre.Quantity) < Number(ingre.Low_stock_threshold),
+            Price: Number(ingre.Price) || 0
         }));
 
         console.log("ข้อมูลที่ส่งไป React:", updatedIngredients);
@@ -74,6 +81,7 @@ exports.getIngredients = async (req, res) => {
         res.status(500).json({ message: "เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์" });
     }
 };
+
 
 
 
