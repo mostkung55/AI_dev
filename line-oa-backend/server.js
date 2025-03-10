@@ -387,16 +387,36 @@ const downloadImage = async (imageId) => {
 
 // ฟังก์ชันตรวจสอบสลิป
 const verifySlip = async (imageId, orderId, customerId) => {
+    let expectedAmount = null;
+
     try {
         const imagePath = await downloadImage(imageId);
         if (!imagePath) {
             return "❌ ไม่สามารถดาวน์โหลดรูปภาพได้ กรุณาส่งใหม่";
         }
 
-        const FormData = require("form-data");
+        // ✅ ดึงยอดเงินจากฐานข้อมูล
+        const [order] = await db.query(
+            "SELECT Total_Amount FROM `Order` WHERE Order_ID = ?",
+            [orderId]
+        );
+
+        if (order.length === 0) {
+            return "❌ ไม่พบคำสั่งซื้อนี้";
+        }
+
+        expectedAmount = order[0]?.Total_Amount || null;
+        const formattedExpectedAmount = expectedAmount !== null ? Number(expectedAmount).toFixed(2) : "ไม่ระบุ";
+
+        if (!expectedAmount) {
+            return "❌ ไม่สามารถดึงยอดที่ต้องชำระได้ กรุณาลองใหม่";
+        }
+
+        // ✅ ส่งยอดเงินไปใน request ของ SlipOK
         const formData = new FormData();
         formData.append("files", fs.createReadStream(imagePath));
         formData.append("log", "true");
+        formData.append("amount", expectedAmount);
 
         const SLIPOK_BRANCH_ID = "40472";
         const SLIPOK_API_KEY = "SLIPOK40XQRAA";
@@ -407,31 +427,69 @@ const verifySlip = async (imageId, orderId, customerId) => {
             {
                 headers: {
                     "x-authorization": SLIPOK_API_KEY,
-                    ...formData.getHeaders()  
+                    ...formData.getHeaders()
                 }
             }
         );
 
-        //ลบไฟล์หลังส่งเสร็จ
         fs.unlinkSync(imagePath);
 
-        console.log("✅ SlipOK Response:", response.data);
-
+        // ✅ ตรวจสอบสลิปสำเร็จ
         if (response.data.success) {
-            await db.query(
-                "UPDATE Payment SET Status = 'Confirmed' WHERE Order_ID = ?",
-                [orderId]
-            );
+            const slipAmount = response.data.data.amount;
 
-            return "✅ สลิปถูกต้องและได้รับการยืนยัน";
+            if (Number(slipAmount) === Number(expectedAmount)) {
+                await db.query(
+                    "UPDATE Payment SET Status = 'Confirmed' WHERE Order_ID = ?",
+                    [orderId]
+                );
+
+               
+                return `✅ สลิปถูกต้องและยอดเงินตรงกัน\n💰 ยอดที่ต้องชำระ: ${formattedExpectedAmount} บาท\n💵 ยอดที่โอน: ${slipAmount.toFixed(2)} บาท`;
+            } else {
+                return `❌ ยอดที่โอน (${slipAmount.toFixed(2)} บาท) ไม่ตรงกับยอดที่ต้องชำระ (${formattedExpectedAmount} บาท)\nกรุณาตรวจสอบและลองใหม่อีกครั้ง`;
+            }
         } else {
-            return "❌ สลิปไม่ถูกต้อง กรุณาส่งใหม่";
+            const errorCode = response.data.code;
+            let errorMessage = response.data.message || "มีข้อผิดพลาดในการตรวจสอบสลิป";
+            const slipAmount = response.data.data?.amount || "ไม่ระบุ";
+
+            // ✅ กำหนดข้อความสำรองถ้า message ว่าง
+            if (!errorMessage || errorMessage.trim() === "") {
+                console.error("❌ Message cannot be empty");
+                errorMessage = "มีข้อผิดพลาดในการตรวจสอบสลิป กรุณาลองใหม่อีกครั้ง";
+            }
+
+            
+            if (errorCode === 1013) {
+                return `❌ ยอดที่โอน (${slipAmount} บาท) ไม่ตรงกับยอดที่ต้องชำระ (${formattedExpectedAmount} บาท)\nกรุณาตรวจสอบและลองใหม่อีกครั้ง`;
+            } else {
+                return `❌ ${errorMessage}`;
+            }
         }
     } catch (error) {
-        console.error("❌ Error verifying slip:", error.response ? error.response.data : error.message);
-        return `❌ มีข้อผิดพลาดในการตรวจสอบสลิป`;
+        if (error.response) {
+            let errorMessage = error.response.data.message || "มีข้อผิดพลาดในการตรวจสอบสลิป";
+
+            // ✅ กำหนดข้อความสำรองถ้า message ว่าง
+            if (!errorMessage || errorMessage.trim() === "") {
+                console.error("❌ Message cannot be empty");
+                errorMessage = "มีข้อผิดพลาดในการตรวจสอบสลิป กรุณาลองใหม่อีกครั้ง";
+            }
+
+            return `❌ ${errorMessage}`;
+        } else {
+            console.error("❌ Error verifying slip:", error.message);
+            return `❌ มีข้อผิดพลาดในการตรวจสอบสลิป`;
+        }
     }
 };
+
+
+
+
+
+
 
 
 

@@ -123,6 +123,7 @@ const notifyCustomer = async (customerId, status, orderId) => {
     console.log(`📢 แจ้งเตือนลูกค้า: ${customerId} สถานะใหม่: ${status}`);
 
     let message = "";
+
     switch (status) {
         case "Preparing":
             message = "✅ คำสั่งซื้อของคุณกำลังถูกเตรียม!";
@@ -130,24 +131,33 @@ const notifyCustomer = async (customerId, status, orderId) => {
         case "Delivering":
             message = "🚚 คำสั่งซื้อของคุณกำลังถูกจัดส่ง!";
             break;
-        case "Completed":
-            // ✅ เพิ่มการแจ้งเตือนช่องทางการชำระเงิน
-            await exports.sendNotification(orderId);
-            break;
         case "Paid":
             message = "💰 คำสั่งซื้อของคุณถูกชำระเงินเรียบร้อยแล้ว!";
             break;
         default:
             message = `📢 คำสั่งซื้อของคุณเปลี่ยนสถานะเป็น: ${status}`;
+            break;
     }
 
-    try {
-        await client.pushMessage(customerId, { type: "text", text: message });
-        console.log(`✅ แจ้งเตือนลูกค้าสำเร็จ: ${customerId}`);
-    } catch (error) {
-        console.error("❌ Error sending notification to customer:", error);
+    // ✅ กรณี Completed ให้ข้ามการตรวจสอบ message ว่าง และส่ง Flex Message แทน
+    if (status === "Completed") {
+        console.log("✅ Sending payment notification for Completed status...");
+        await exports.sendNotification(orderId);
+    } else {
+        if (!message || message.trim() === "") {
+            console.error("❌ Message cannot be empty");
+            return;
+        }
+
+        try {
+            await client.pushMessage(customerId, { type: "text", text: message });
+            console.log(`✅ แจ้งเตือนลูกค้าสำเร็จ: ${customerId}`);
+        } catch (error) {
+            console.error("❌ Error sending notification to customer:", error.response?.data || error.message);
+        }
     }
 };
+
 
 
 // 📌 PUT: อัปเดตสถานะของสินค้าใน Order Item และอัปเดตสถานะ Order
