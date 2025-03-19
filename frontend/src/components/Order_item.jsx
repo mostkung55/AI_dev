@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
-import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Typography, Select, MenuItem } from "@mui/material";
+import { useSearchParams , useNavigate} from "react-router-dom";
+import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Typography, Select, MenuItem, IconButton } from "@mui/material";
+
 import axios from "axios";
 import "./Order_item.css"; 
+
 
 const OrderItem = () => {
   const [orderItems, setOrderItems] = useState([]);
   const [searchParams] = useSearchParams();
   const orderId = searchParams.get("order_id");
-
+  const navigate = useNavigate();
   useEffect(() => {
     loadData();
   }, [orderId]);
@@ -44,6 +46,14 @@ const OrderItem = () => {
   return (
     <div className="order-container">
       
+      <IconButton
+        variant="outlined"
+        color="secondary"
+        onClick={() => navigate('/order')} // ✅ ย้อนกลับไปหน้า ManageOrder
+        sx={{ marginBottom: 2 }}
+      >
+        ⬅️
+      </IconButton>
       <Typography variant="h4" align="center" gutterBottom>
         🛒 Order Items
       </Typography>

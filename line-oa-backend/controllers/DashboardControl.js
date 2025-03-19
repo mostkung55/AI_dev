@@ -21,7 +21,7 @@ const calculateProfit = async (startDate, endDate) => {
             FROM Ingredient_Item ii
             WHERE ii.Updated_at BETWEEN ? AND ?;
         `, [start, end]);
- 
+       
         // ✅ คำนวณกำไร
         const profit = (totalSales[0]?.totalSales || 0) - (totalCost[0]?.totalCost || 0);
 
@@ -46,7 +46,7 @@ exports.getSalesData = async (req, res) => {
             SELECT DATE(Created_at) AS day,
                    SUM(Total_Amount) AS sales
             FROM \`Order\`
-            WHERE Status IN ('paid', 'completed')
+            WHERE Status IN ('paid')
             GROUP BY DATE(Created_at)
             ORDER BY DATE(Created_at)
         `);
@@ -56,7 +56,7 @@ exports.getSalesData = async (req, res) => {
             SELECT ANY_VALUE(CONCAT(YEAR(Created_at), '-W', WEEK(Created_at))) AS week,
                    SUM(Total_Amount) AS sales
             FROM \`Order\`
-            WHERE Status IN ('paid', 'completed')
+            WHERE Status IN ('paid')
             GROUP BY YEAR(Created_at), WEEK(Created_at)
             ORDER BY YEAR(Created_at), WEEK(Created_at)
         `);
@@ -66,7 +66,7 @@ exports.getSalesData = async (req, res) => {
             SELECT ANY_VALUE(MONTHNAME(Created_at)) AS month,
                    SUM(Total_Amount) AS sales
             FROM \`Order\`
-            WHERE Status IN ('paid', 'completed')
+            WHERE Status IN ('paid')
             GROUP BY YEAR(Created_at), MONTH(Created_at)
             ORDER BY YEAR(Created_at), MONTH(Created_at)
         `);
@@ -93,13 +93,13 @@ exports.getSalesSummary = async (req, res) => {
         const [totalSales] = await db.query(`
             SELECT SUM(Total_Amount) AS totalSales 
             FROM \`Order\`
-            WHERE Status IN ('completed', 'paid')
+            WHERE Status IN ('paid')
         `);
 
         const [orderCount] = await db.query(`
             SELECT COUNT(*) AS orderCount 
             FROM \`Order\`
-            WHERE Status IN ('completed', 'paid')
+            WHERE Status IN ('paid')
         `);
 
         res.status(200).json({

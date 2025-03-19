@@ -53,10 +53,18 @@ const IngredientItem = () => {
   };
 
   return (
-    <div className="container">
-      <IconButton onClick={() => navigate(-1)} style={{ marginBottom: "10px" }}>
-        <ArrowBackIcon />
-      </IconButton>
+    <div className="ingredient-container">
+      <div className="back-button-container">
+            <IconButton 
+              variant="outlined"
+              color="secondary"
+              onClick={() => navigate('/Ingre')} 
+              sx={{ marginBottom: 2 }}
+            >
+              ⬅️
+            </IconButton>
+      </div>
+      
 
 
       <Typography variant="h5" align="center" gutterBottom>

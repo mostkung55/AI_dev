@@ -1,0 +1,14 @@
+.ingredient-container {
+    padding: 20px;
+}
+
+.back-button-container {
+    display: flex;
+    justify-content: flex-start; /* ✅ ปรับให้ปุ่มอยู่ชิดซ้าย */
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.ingredient-container h5 {
+    margin-bottom: 20px;
+}

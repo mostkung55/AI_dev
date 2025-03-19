@@ -63,7 +63,7 @@ const Dashboard = () => {
       // ✅ อัปเดตข้อมูลสรุป รวมถึงต้นทุน และกำไร
       setSummary(prev => ({
         ...prev,
-        totalCost: res.data.totalCost || 0, // ✅ ถ้าไม่มีข้อมูลให้เป็น 0
+        totalCost: res.data.totalCost || 0,
         profit: res.data.profit || 0
       }));
   
@@ -91,36 +91,57 @@ const Dashboard = () => {
       </Typography>
 
       {/* 🔹 Section: Sales Summary */}
-      <Grid container spacing={3} justifyContent="center">
-        <Grid item xs={12} sm={4}>
-          <Paper sx={{ padding: 3, textAlign: "center", borderRadius: 2, boxShadow: 2 }}>
-            <Typography variant="h6" color="textSecondary">ยอดขายรวม</Typography>
-            <Typography variant="h5" fontWeight="bold">
-              {summary.totalSales.toLocaleString()} บาท
-            </Typography>
-          </Paper>
-        </Grid>
-        <Grid item xs={12} sm={4}>
-          <Paper sx={{ padding: 3, textAlign: "center", borderRadius: 2, boxShadow: 2 }}>
-            <Typography variant="h6" color="textSecondary">จำนวนออเดอร์</Typography>
-            <Typography variant="h5" fontWeight="bold">
-              {summary.orderCount.toLocaleString()} รายการ
-            </Typography>
-          </Paper>
-        </Grid>
-        <Grid item xs={12} sm={3}>
-            <Paper sx={{ padding: 3, textAlign: "center", borderRadius: 2, boxShadow: 2 }}>
-              <Typography variant="h6" color="textSecondary">กำไรสุทธิ</Typography>
-              <Typography 
-                variant="h5" 
-                fontWeight="bold" 
-                color={(summary.profit ?? 0) >= 0 ? "primary" : "error"}
-              >
-                {(summary.profit ?? 0).toLocaleString()} บาท
-              </Typography>
-            </Paper>
-        </Grid>
-      </Grid>
+               
+          <Grid container spacing={2} justifyContent="center">
+              {/* ✅ ยอดขายรวม */}
+              <Grid item xs={12} sm={3}>
+                  <Paper sx={{ padding: 3, textAlign: "center", borderRadius: 2, boxShadow: 2 }}>
+                      <Typography variant="h6" color="textSecondary">ยอดขายรวม</Typography>
+                      <Typography variant="h5" fontWeight="bold">
+                          {summary.totalSales.toLocaleString()} บาท
+                      </Typography>
+                  </Paper>
+              </Grid>
+
+              {/* ✅ จำนวนออเดอร์ */}
+              <Grid item xs={12} sm={3}>
+                  <Paper sx={{ padding: 3, textAlign: "center", borderRadius: 2, boxShadow: 2 }}>
+                      <Typography variant="h6" color="textSecondary">จำนวนออเดอร์</Typography>
+                      <Typography variant="h5" fontWeight="bold">
+                          {summary.orderCount.toLocaleString()} รายการ
+                      </Typography>
+                  </Paper>
+              </Grid>
+
+              {/* ✅ ต้นทุนรวม */}
+              <Grid item xs={12} sm={3}>
+                  <Paper sx={{ padding: 3, textAlign: "center", borderRadius: 2, boxShadow: 2 }}>
+                      <Typography variant="h6" color="textSecondary">ต้นทุนรวม</Typography>
+                      <Typography 
+                          variant="h5" 
+                          fontWeight="bold" 
+                          color={(summary.totalCost ?? 0) >= 0 ? "primary" : "error"}
+                      >
+                          {(summary.totalCost ?? 0).toLocaleString()} บาท
+                      </Typography>
+                  </Paper>
+              </Grid>
+
+              {/* ✅ กำไรสุทธิ */}
+              <Grid item xs={12} sm={3}>
+                  <Paper sx={{ padding: 3, textAlign: "center", borderRadius: 2, boxShadow: 2 }}>
+                      <Typography variant="h6" color="textSecondary">กำไรสุทธิ</Typography>
+                      <Typography 
+                          variant="h5" 
+                          fontWeight="bold" 
+                          color={(summary.profit ?? 0) >= 0 ? "primary" : "error"}
+                      >
+                          {(summary.profit ?? 0).toLocaleString()} บาท
+                      </Typography>
+                  </Paper>
+              </Grid>
+          </Grid>
+
       
 
       {/* 🔹 Section: Charts */}
