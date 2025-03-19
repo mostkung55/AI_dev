@@ -12,6 +12,7 @@ const route_order = require('./routes/route_order');
 const route_orderitem = require('./routes/route_orderitems');
 const route_ingredientitems = require('./routes/route_ingredientitems');
 const route_ingredient = require('./routes/route_ingredient');
+const dashboardRoutes = require("./routes/route_dashboard");
 const { checkIngredientsAvailability, deductIngredientsFromStock } = require("./controllers/manage_Order");
 
 const path = require("path");
@@ -34,6 +35,7 @@ app.use("/api/orders", route_order);
 app.use("/api/order_items",route_orderitem);
 app.use("/api/ingredient",route_ingredient);
 app.use("/api/ingredientItems",route_ingredientitems);
+app.use('/api/dashboard', dashboardRoutes);
 
 
 const config = {
@@ -431,7 +433,7 @@ const verifySlip = async (imageId, orderId, customerId) => {
                 }
             }
         );
-
+        
         fs.unlinkSync(imagePath);
 
         // ✅ ตรวจสอบสลิปสำเร็จ

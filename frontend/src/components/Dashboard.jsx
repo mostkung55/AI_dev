@@ -48,7 +48,7 @@ const Dashboard = () => {
   
   const loadSummaryData = async () => {
     try {
-      const res = await axios.get("http://localhost:3000/api/orders/sales-summary");
+      const res = await axios.get("http://localhost:3000/api/dashboard/sales-summary");
       setSummary(res.data || { totalSales: 0, orderCount: 0 });
     } catch (error) {
       console.error("🚨 Error loading sales summary:", error);
@@ -58,7 +58,7 @@ const Dashboard = () => {
 
   const loadSalesData = async () => {
     try {
-      const res = await axios.get("http://localhost:3000/api/orders/sales-data");
+      const res = await axios.get("http://localhost:3000/api/dashboard/sales-data");
   
       // ✅ อัปเดตข้อมูลสรุป รวมถึงต้นทุน และกำไร
       setSummary(prev => ({

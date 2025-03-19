@@ -210,109 +210,11 @@ exports.deductIngredientsFromStock = async (orderItems) => {
 
 
 
-// ✅ GET: ดึงยอดขายรวม + จำนวน Order ทั้งหมด
-exports.getSalesSummary = async (req, res) => {
-  try {
-    const [totalSales] = await db.query(`
-      SELECT SUM(Total_Amount) AS totalSales 
-      FROM \`Order\`
-      WHERE Status IN ('Completed', 'Paid')
-    `);
-    const [orderCount] = await db.query(`
-      SELECT COUNT(*) AS orderCount 
-      FROM \`Order\`
-      WHERE Status IN ('Completed', 'Paid')
-    `);
-
-    res.status(200).json({
-      totalSales: totalSales[0].totalSales || 0,
-      orderCount: orderCount[0].orderCount || 0,
-    });
-  } catch (error) {
-    console.error("🚨 ดึงข้อมูลยอดขายรวมไม่สำเร็จ:", error);
-    res.status(500).json({ message: "เกิดข้อผิดพลาดในการดึงข้อมูลยอดขายรวม" });
-  }
-};
 
 
-// exports.getSalesData = async (req, res) => {
-//   try {
-//     const [dailySales] = await db.query(`
-//       SELECT DATE(O.Created_at) AS day,
-//              SUM(O.Total_Amount) AS sales
-//       FROM \`Order\` O
-//       WHERE O.Status IN ('paid', 'completed')
-//       GROUP BY DATE(O.Created_at)
-//       ORDER BY DATE(O.Created_at)
-//     `);
-    
-//     // ✅ ดึงยอดขายรายสัปดาห์
-//     const [weeklySales] = await db.query(`
-//       SELECT ANY_VALUE(CONCAT(YEAR(O.Created_at), '-W', WEEK(O.Created_at))) AS week,
-//              IFNULL(SUM(O.Total_Amount), 0) AS sales
-//       FROM \`Order\` O
-//       WHERE O.Status IN ('paid', 'completed')
-//       GROUP BY YEAR(O.Created_at), WEEK(O.Created_at)
-//       ORDER BY YEAR(O.Created_at), WEEK(O.Created_at)
-//     `);
-    
-    
-    
-
-//     // ✅ ดึงยอดขายรายเดือน
-//     const [monthlySales] = await db.query(`
-//       SELECT ANY_VALUE(MONTHNAME(O.Created_at)) AS month, 
-//              IFNULL(SUM(O.Total_Amount), 0) AS sales
-//       FROM \`Order\` O
-//       WHERE O.Status IN ('paid', 'completed')
-//       GROUP BY YEAR(O.Created_at), MONTH(O.Created_at)
-//       ORDER BY YEAR(O.Created_at), MONTH(O.Created_at)
-//     `);
-    
-
-//     const [costResult] = await db.query(`
-//       SELECT IFNULL(SUM(I.Price * JT.quantity), 0) AS totalCost
-//       FROM \`Order\` O
-//       JOIN \`Order_Item\` OI ON O.Order_ID = OI.Order_ID
-//       JOIN \`Product\` P ON OI.Product_ID = P.Product_ID
-//       JOIN JSON_TABLE(
-//         P.Ingredients,
-//         '$[*]' COLUMNS (
-//           id INT PATH '$.id',
-//           name VARCHAR(255) PATH '$.name',
-//           quantity INT PATH '$.quantity'
-//         )
-//       ) AS JT ON JT.id = I.Ingredient_ID
-//       JOIN \`Ingredient_Item\` I ON JT.id = I.Ingredient_ID
-//       WHERE O.Status IN ('paid', 'completed')
-//     `);
-    
-    
-    
 
 
-//     const totalCost = costResult[0]?.totalCost || 0;
 
-//     // ✅ คำนวณกำไรสุทธิ
-//     const totalSales = dailySales.reduce((total, sale) => total + sale.sales, 0);
-//     const profit = totalSales - totalCost;
-
-//     console.log(`💡 totalSales: ${totalSales}`);
-//     console.log(`💡 totalCost: ${totalCost}`);
-//     console.log(`💡 profit: ${profit}`);
-
-//     res.status(200).json({
-//       dailySales,
-//       weeklySales,
-//       monthlySales,
-//       totalCost,
-//       profit
-//     });
-//   } catch (error) {
-//     console.error("🚨 Error fetching sales data:", error);
-//     res.status(500).json({ message: "Failed to fetch sales data." });
-//   }
-// };
 
 
 
