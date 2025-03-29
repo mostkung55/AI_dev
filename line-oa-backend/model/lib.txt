@@ -1,0 +1,10 @@
+transformers
+torch
+fuzzywuzzy
+pandas
+pymysql
+pythainlp
+protobuf
+tiktoken
+sentencepiece
+python-Levenshtein

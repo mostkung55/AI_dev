@@ -21,7 +21,7 @@ const calculateProfit = async (startDate, endDate) => {
             FROM Ingredient_Item ii
             WHERE ii.Updated_at BETWEEN ? AND ?;
         `, [start, end]);
-       
+
         //  คำนวณกำไร
         const profit = (totalSales[0]?.totalSales || 0) - (totalCost[0]?.totalCost || 0);
 

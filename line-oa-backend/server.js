@@ -32,9 +32,9 @@ app.use(cors());
 app.use('/api/products', route_product);
 app.use("/uploads", express.static("uploads"));
 app.use("/api/orders", route_order);
-app.use("/api/order_items",route_orderitem);
-app.use("/api/ingredient",route_ingredient);
-app.use("/api/ingredientItems",route_ingredientitems);
+app.use("/api/order_items", route_orderitem);
+app.use("/api/ingredient", route_ingredient);
+app.use("/api/ingredientItems", route_ingredientitems);
 app.use('/api/dashboard', dashboardRoutes);
 
 
@@ -129,7 +129,7 @@ app.post("/webhook", async (req, res) => {
                 );
 
                 //  เรียกโมเดล Python
-                const modelPath = path.join(__dirname, "..", "model", "model.py");
+                const modelPath = path.join(__dirname, ".", "model", "model.py");
                 exec(`python "${modelPath}" "${customerText}"`, async (error, stdout) => {
                     if (error) {
                         console.error("❌ Error running model:", error);
@@ -239,25 +239,25 @@ app.post("/webhook", async (req, res) => {
             }
 
 
-                const [latestOrder] = await db.query(
-                    "SELECT Order_ID FROM `Order` WHERE Customer_ID = ? ORDER BY Order_ID DESC LIMIT 1",
-                    [event.source.userId]
-                );
+            const [latestOrder] = await db.query(
+                "SELECT Order_ID FROM `Order` WHERE Customer_ID = ? ORDER BY Order_ID DESC LIMIT 1",
+                [event.source.userId]
+            );
 
-                if (latestOrder.length === 0) {
-                    return client.replyMessage(event.replyToken, { type: "text", text: "⛔ ไม่พบคำสั่งซื้อของคุณ" });
-                }
+            if (latestOrder.length === 0) {
+                return client.replyMessage(event.replyToken, { type: "text", text: "⛔ ไม่พบคำสั่งซื้อของคุณ" });
+            }
 
-                const orderId = latestOrder[0].Order_ID;
+            const orderId = latestOrder[0].Order_ID;
 
-                const resultMessage = await verifySlip(imageId, orderId, event.source.userId);
-                
-                await client.replyMessage(event.replyToken, {
-                    type: "text",
-                    text: resultMessage
-                });
+            const resultMessage = await verifySlip(imageId, orderId, event.source.userId);
+
+            await client.replyMessage(event.replyToken, {
+                type: "text",
+                text: resultMessage
+            });
         }
-        
+
         //  ตรวจจับเมื่อมีการกดปุ่ม Confirm หรือ Cancel
         else if (event.type === "postback") {
             let data;
@@ -267,8 +267,8 @@ app.post("/webhook", async (req, res) => {
                 console.error("❌ JSON Parse Error in postback:", error);
                 return;
             }
-        
-        
+
+
             if (data.action === "confirm_order") {
                 try {
                     //  ตรวจสอบวัตถุดิบก่อน
@@ -280,14 +280,14 @@ app.post("/webhook", async (req, res) => {
                         });
                         return;
                     }
-            
+
                     // บันทึก Order ลงฐานข้อมูล
                     const [orderResult] = await db.query(
                         "INSERT INTO `Order` (Customer_ID, Total_Amount, Customer_Address, Status) VALUES (?, ?, NULL, 'Awaiting Address')",
                         [data.customerId, data.totalAmount]
                     );
                     const orderId = orderResult.insertId;
-            
+
                     //  บันทึก Order Items
                     for (let item of data.orderItems) {
                         await db.query(
@@ -295,16 +295,16 @@ app.post("/webhook", async (req, res) => {
                             [orderId, item.product_id, item.quantity, item.subtotal]
                         );
                     }
-            
+
                     //  หักสต็อกวัตถุดิบ
                     await deductIngredientsFromStock(data.orderItems);
-            
+
                     //  แจ้งลูกค้าให้ส่งที่อยู่
                     await client.replyMessage(event.replyToken, {
                         type: "text",
                         text: "✅ คำสั่งซื้อของคุณได้รับการยืนยันแล้ว!\n📍 กรุณาส่งที่อยู่สำหรับจัดส่งสินค้าของคุณ"
                     });
-            
+
                 } catch (error) {
                     console.error("❌ Error saving order:", error);
                     await client.replyMessage(event.replyToken, { type: "text", text: "เกิดข้อผิดพลาด กรุณาลองใหม่" });
@@ -316,32 +316,32 @@ app.post("/webhook", async (req, res) => {
                     type: "text",
                     text: "❌ คำสั่งซื้อของคุณถูกยกเลิกเรียบร้อยแล้ว"
                 });
-            }else if (data.action === "payment") {
+            } else if (data.action === "payment") {
                 let paymentText = data.method === "cash" ? "💵 เงินสด" : "💳 โอนเงิน";
 
                 const [order] = await db.query("SELECT Total_Amount FROM `Order` WHERE Order_ID = ?", [data.orderId]);
-            
+
                 const amount = order[0].Total_Amount;
                 await db.query(
                     "INSERT INTO `Payment` (Order_ID, Amount, Method, Payment_Date, Status) VALUES (?, ?, ?, NOW(), 'Pending') " +
                     "ON DUPLICATE KEY UPDATE Method = VALUES(Method), Status = 'Pending'",
                     [data.orderId, amount, data.method]
                 );
-                   
+
                 if (data.method === "transfer") {
                     const accountDetails = `🏦 รายละเอียดบัญชีสำหรับโอนเงิน:\n\n` +
-                                           `ธนาคาร: กสิกรไทย (KBank)\n` +
-                                           `ชื่อบัญชี: นาย พิสิษฐ์ ศรีโมอ่อน\n` +
-                                           `เลขที่บัญชี: 142-1-36089-4\n\n` +
-                                           `💰 ยอดที่ต้องชำระ: ${amount} บาท\n\n` +
-                                           `📌 กรุณาโอนเงินและส่งสลิปยืนยันการชำระเงิน`;
-            
+                        `ธนาคาร: กสิกรไทย (KBank)\n` +
+                        `ชื่อบัญชี: นาย พิสิษฐ์ ศรีโมอ่อน\n` +
+                        `เลขที่บัญชี: 142-1-36089-4\n\n` +
+                        `💰 ยอดที่ต้องชำระ: ${amount} บาท\n\n` +
+                        `📌 กรุณาโอนเงินและส่งสลิปยืนยันการชำระเงิน`;
+
                     await client.replyMessage(event.replyToken, {
                         type: "text",
                         text: accountDetails
                     });
-            
-                } else if (data.method === "cash" ) {
+
+                } else if (data.method === "cash") {
                     await client.replyMessage(event.replyToken, {
                         type: "text",
                         text: `💰 ยอดที่ต้องชำระ: ${amount} บาท\n\n📌 โปรดเตรียมเงินให้พร้อม`
@@ -354,7 +354,7 @@ app.post("/webhook", async (req, res) => {
                     });
                 }
             }
-            
+
         }
     }
 
@@ -369,7 +369,7 @@ const downloadImage = async (imageId) => {
         console.log("📥 Downloading image from:", url);
         // console.log("📥 Sending request with headers:", headers);
         const response = await axios.get(url, { headers, responseType: "arraybuffer" });
-        
+
 
         const tmpDir = path.join(__dirname, "tmp");
         if (!fs.existsSync(tmpDir)) {
@@ -377,7 +377,7 @@ const downloadImage = async (imageId) => {
         }
 
         const imagePath = path.join(tmpDir, `slip-${imageId}.jpg`);
-        fs.writeFileSync(imagePath, response.data);  
+        fs.writeFileSync(imagePath, response.data);
 
         return imagePath;
     } catch (error) {
@@ -397,7 +397,7 @@ const verifySlip = async (imageId, orderId, customerId) => {
             return "❌ ไม่สามารถดาวน์โหลดรูปภาพได้ กรุณาส่งใหม่";
         }
 
-        //  ดึงยอดเงินจากฐานข้อมูล
+        // ✅ ดึงยอดเงินจากฐานข้อมูล
         const [order] = await db.query(
             "SELECT Total_Amount FROM `Order` WHERE Order_ID = ?",
             [orderId]
@@ -414,7 +414,7 @@ const verifySlip = async (imageId, orderId, customerId) => {
             return "❌ ไม่สามารถดึงยอดที่ต้องชำระได้ กรุณาลองใหม่";
         }
 
-        //  ส่งยอดเงินไปใน request ของ SlipOK
+        // ✅ ส่งยอดเงินไปใน request ของ SlipOK
         const formData = new FormData();
         formData.append("files", fs.createReadStream(imagePath));
         formData.append("log", "true");
@@ -433,10 +433,10 @@ const verifySlip = async (imageId, orderId, customerId) => {
                 }
             }
         );
-        
+
         fs.unlinkSync(imagePath);
 
-        //  ตรวจสอบสลิปสำเร็จ
+        // ✅ ตรวจสอบสลิปสำเร็จ
         if (response.data.success) {
             const slipAmount = response.data.data.amount;
 
@@ -446,7 +446,7 @@ const verifySlip = async (imageId, orderId, customerId) => {
                     [orderId]
                 );
 
-               
+
                 return `✅ สลิปถูกต้องและยอดเงินตรงกัน\n💰 ยอดที่ต้องชำระ: ${formattedExpectedAmount} บาท\n💵 ยอดที่โอน: ${slipAmount.toFixed(2)} บาท`;
             } else {
                 return `❌ ยอดที่โอน (${slipAmount.toFixed(2)} บาท) ไม่ตรงกับยอดที่ต้องชำระ (${formattedExpectedAmount} บาท)\nกรุณาตรวจสอบและลองใหม่อีกครั้ง`;
@@ -456,13 +456,13 @@ const verifySlip = async (imageId, orderId, customerId) => {
             let errorMessage = response.data.message || "มีข้อผิดพลาดในการตรวจสอบสลิป";
             const slipAmount = response.data.data?.amount || "ไม่ระบุ";
 
-            //  กำหนดข้อความสำรองถ้า message ว่าง
+            // ✅ กำหนดข้อความสำรองถ้า message ว่าง
             if (!errorMessage || errorMessage.trim() === "") {
                 console.error("❌ Message cannot be empty");
                 errorMessage = "มีข้อผิดพลาดในการตรวจสอบสลิป กรุณาลองใหม่อีกครั้ง";
             }
 
-            
+
             if (errorCode === 1013) {
                 return `❌ ยอดที่โอน (${slipAmount} บาท) ไม่ตรงกับยอดที่ต้องชำระ (${formattedExpectedAmount} บาท)\nกรุณาตรวจสอบและลองใหม่อีกครั้ง`;
             } else {
@@ -473,7 +473,7 @@ const verifySlip = async (imageId, orderId, customerId) => {
         if (error.response) {
             let errorMessage = error.response.data.message || "มีข้อผิดพลาดในการตรวจสอบสลิป";
 
-            //  กำหนดข้อความสำรองถ้า message ว่าง
+            // ✅ กำหนดข้อความสำรองถ้า message ว่าง
             if (!errorMessage || errorMessage.trim() === "") {
                 console.error("❌ Message cannot be empty");
                 errorMessage = "มีข้อผิดพลาดในการตรวจสอบสลิป กรุณาลองใหม่อีกครั้ง";
@@ -507,7 +507,7 @@ cron.schedule("0 12 * * *", async () => {
     } catch (error) {
         console.error("Error sending menu:", error);
     }
-    
+
 }, {
     scheduled: true,
     timezone: "Asia/Bangkok"

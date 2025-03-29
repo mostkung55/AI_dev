@@ -14,10 +14,10 @@ import {
   Paper,
   IconButton,
 } from "@mui/material";
-import { Delete, Edit, Add } from "@mui/icons-material";
+import { Delete, Add, CheckCircle, Cancel } from "@mui/icons-material";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import ListAltIcon from "@mui/icons-material/ListAlt"; 
+import ListAltIcon from "@mui/icons-material/ListAlt";
 
 
 const ManageIngre = () => {
@@ -26,9 +26,15 @@ const ManageIngre = () => {
   const [ingreUnit, setIngreUnit] = useState("");
   const [open, setOpen] = useState(false);
   const [lowStockThreshold, setLowStockThreshold] = useState("");
-  const [expDate, setExpDate] = useState(""); 
+  const [expDate, setExpDate] = useState("");
   const navigate = useNavigate();
   const [price, setPrice] = useState("");
+  const [slipFile, setSlipFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+
+  const [openPopup, setOpenPopup] = useState(false);
+  const [popupMessage, setPopupMessage] = useState("");
+  const [popupType, setPopupType] = useState("success");
 
 
   useEffect(() => {
@@ -37,46 +43,57 @@ const ManageIngre = () => {
 
   const loadIngredients = async () => {
     try {
-        const res = await axios.get("http://localhost:3000/api/ingredient");
+      const res = await axios.get("http://localhost:3000/api/ingredient");
 
-        //  ตรวจสอบและกำหนดค่า isLowStock ใหม่
-        const updatedIngredients = res.data.map(ingre => ({
-            ...ingre,
-            isLowStock: Number(ingre.Quantity) < Number(ingre.Low_stock_threshold), //  คำนวณใหม่ทุกครั้ง
-        }));
-        setIngredients(updatedIngredients);
+      //  ตรวจสอบและกำหนดค่า isLowStock ใหม่
+      const updatedIngredients = res.data.map(ingre => ({
+        ...ingre,
+        isLowStock: Number(ingre.Quantity) < Number(ingre.Low_stock_threshold), //  คำนวณใหม่ทุกครั้ง
+      }));
+      setIngredients(updatedIngredients);
     } catch (error) {
-        console.error("โหลดวัตถุดิบไม่สำเร็จ", error);
+      console.error("โหลดวัตถุดิบไม่สำเร็จ", error);
     }
-};
+  };
 
 
-const handleAddIngredient = async () => {
-  if (!ingreName || !ingreUnit || !expDate) {  
-      alert("กรุณากรอกข้อมูลให้ครบ");
+  const handleUploadSlip = async () => {
+    if (!slipFile) {
+      alert("กรุณาเลือกรูปใบเสร็จ");
       return;
-  }
+    }
 
-  try {
-      await axios.post("http://localhost:3000/api/ingredient", {
-          Ingredient_Name: ingreName,  
-          Quantity: parseInt(ingreUnit, 10),
-          Low_stock_threshold: parseInt(lowStockThreshold, 10) || 5, 
-          EXP_date: expDate, //  ส่งค่า EXP_date ไปยัง Backend
-          Price: parseFloat(price), //  ส่งข้อมูล Price ไป Backend
+    const formData = new FormData();
+    formData.append("image", slipFile);
+
+    try {
+      const res = await axios.post("http://localhost:3000/api/ingredient/upload-slip", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
       });
 
-      setIngreName("");
-      setIngreUnit("");
-      setExpDate("");  //  รีเซ็ตค่า EXP_date หลังจากเพิ่มข้อมูล
-      setOpen(false);
-      loadIngredients();
-  } catch (error) {
-      console.error("เพิ่มวัตถุดิบไม่สำเร็จ", error);
-  }
-};
+      // Popup แบบ success
+      setPopupMessage(" อัปโหลดใบเสร็จสำเร็จ");
+      setPopupType("success");
+      setOpenPopup(true);
+      setTimeout(() => setOpenPopup(false), 3000);
 
-  
+      setSlipFile(null);
+      setOpen(false);
+      loadIngredients(); // โหลดวัตถุดิบใหม่
+    } catch (error) {
+      console.error("❌ อัปโหลดใบเสร็จล้มเหลว:", error);
+
+      // Popup แบบ error
+      setPopupMessage("❌ อัปโหลดไม่สำเร็จ");
+      setPopupType("error");
+      setOpenPopup(true);
+      setTimeout(() => setOpenPopup(false), 3000);
+    }
+  };
+
+
 
 
   const handleDeleteIngredient = async (id) => {
@@ -102,7 +119,7 @@ const handleAddIngredient = async () => {
 
       <TableContainer component={Paper}>
         <Table>
-        <TableHead>
+          <TableHead>
             <TableRow style={{ background: "#c5e1a5" }}>
               <TableCell>No.</TableCell>
               <TableCell>Name</TableCell>
@@ -114,38 +131,38 @@ const handleAddIngredient = async () => {
 
 
           <TableBody>
-              {ingredients.map((ingre, index) => (
-                <TableRow 
-                  key={ingre.Ingredient_ID} 
-                  style={{ background: ingre.isLowStock ? "#ffcccc" : "#f8f5e3" }}
-                >
-                  <TableCell>{index + 1}.</TableCell>
-                  <TableCell>{ingre.Ingredient_Name}</TableCell>
-                  <TableCell align="center">{ingre.Quantity}</TableCell>
-                  
-                  <TableCell>
-                        {ingre.isLowStock ? (
-                            <Typography color="error">⚠️ Low Stock (ต่ำกว่า {ingre.Low_stock_threshold})</Typography>
-                        ) : (
-                            <Typography color="green" align="center">✅ Ready to Use</Typography>
-                        )}
-                    </TableCell>
-                    
-                  <TableCell align="center">
-                  <IconButton 
-                      color="primary" 
-                      onClick={() => navigate(`/ingredient_item?ingredient_id=${ingre.Ingredient_ID}&ingredient_name=${encodeURIComponent(ingre.Ingredient_Name)}`)}
+            {ingredients.map((ingre, index) => (
+              <TableRow
+                key={ingre.Ingredient_ID}
+                style={{ background: ingre.isLowStock ? "#ffcccc" : "#f8f5e3" }}
+              >
+                <TableCell>{index + 1}.</TableCell>
+                <TableCell>{ingre.Ingredient_Name}</TableCell>
+                <TableCell align="center">{ingre.Quantity}</TableCell>
+
+                <TableCell>
+                  {ingre.isLowStock ? (
+                    <Typography color="error">⚠️ Low Stock (ต่ำกว่า {ingre.Low_stock_threshold})</Typography>
+                  ) : (
+                    <Typography color="green" align="center">✅ Ready to Use</Typography>
+                  )}
+                </TableCell>
+
+                <TableCell align="center">
+                  <IconButton
+                    color="primary"
+                    onClick={() => navigate(`/ingredient_item?ingredient_id=${ingre.Ingredient_ID}&ingredient_name=${encodeURIComponent(ingre.Ingredient_Name)}`)}
                   >
-                      <ListAltIcon />  
+                    <ListAltIcon />
                   </IconButton>
-                    
-                    <IconButton color="error" onClick={() => handleDeleteIngredient(ingre.Ingredient_ID)}>
-                      <Delete />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
+
+                  <IconButton color="error" onClick={() => handleDeleteIngredient(ingre.Ingredient_ID)}>
+                    <Delete />
+                  </IconButton>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
 
         </Table>
       </TableContainer>
@@ -175,56 +192,88 @@ const handleAddIngredient = async () => {
       </Typography>
 
       {/* Modal ฟอร์มเพิ่ม */}
-      <Modal open={open} onClose={() => setOpen(false)}>
+      <Modal
+        open={open}
+        onClose={() => {
+          setOpen(false);
+          setPreviewUrl(null);     //  เคลียร์ preview
+          setSlipFile(null);       //  เคลียร์ไฟล์
+        }}
+      >
         <Box className="modal-box">
           <Typography variant="h6" gutterBottom>
-            {"Add New Ingredient"}
+            Upload Receipt Slip
           </Typography>
-          <TextField
-            label="Ingredient Name"
-            value={ingreName}
-            onChange={(e) => setIngreName(e.target.value)}
-            fullWidth
-            margin="normal"
-            size="small"
-          />
-          <TextField
-            label="Quantity"
-            value={ingreUnit}
-            onChange={(e) => setIngreUnit(e.target.value)}
-            fullWidth
-            margin="normal"
-            size="small"
-          />
-          <TextField
-            label="Expiration Date"
-            type="date"
-            value={expDate}
-            onChange={(e) => setExpDate(e.target.value)}
-            fullWidth
-            margin="normal"
-            size="small"
-            InputLabelProps={{
-                shrink: true,
+
+          {/* เลือกไฟล์ */}
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => {
+              const file = e.target.files[0];
+              setSlipFile(file);
+              if (file) {
+                setPreviewUrl(URL.createObjectURL(file));
+              }
             }}
-        />
-        <TextField
-            label="Price"
-            type="number"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
+            style={{ marginBottom: "1rem" }}
+          />
+
+          {/* รูป Preview */}
+          {previewUrl && (
+            <img
+              src={previewUrl}
+              alt="receipt preview"
+              style={{
+                width: "100%",
+                maxHeight: "300px",
+                objectFit: "contain",
+                marginBottom: "1rem",
+                borderRadius: "8px",
+                boxShadow: "0 0 6px rgba(0,0,0,0.2)",
+              }}
+            />
+          )}
+
+          {/* ปุ่มอัปโหลด */}
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleUploadSlip}
             fullWidth
-            margin="normal"
-            size="small"
-        />
-          
-          <Button variant="contained" color="primary" onClick={handleAddIngredient} fullWidth>
-            ADD INGREDIENT
+            disabled={!slipFile}
+          >
+            Upload Slip
           </Button>
         </Box>
       </Modal>
+      <Modal open={openPopup} onClose={() => setOpenPopup(false)}>
+        <Box
+          sx={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            bgcolor: "white",
+            boxShadow: 24,
+            p: 4,
+            borderRadius: 3,
+            textAlign: "center",
+          }}
+        >
+          {popupType === "success" ? (
+            <CheckCircle sx={{ fontSize: 60, color: "green" }} />
+          ) : (
+            <Cancel sx={{ fontSize: 60, color: "red" }} />
+          )}
 
-     
+          <Typography variant="h6" sx={{ mt: 2, fontWeight: "bold" }}>
+            {popupMessage}
+          </Typography>
+        </Box>
+      </Modal>
+
+
     </div>
   );
 };

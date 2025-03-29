@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { useSearchParams , useNavigate} from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Typography, Select, MenuItem, IconButton } from "@mui/material";
 
 import axios from "axios";
-import "./Order_item.css"; 
+import "./Order_item.css";
 
 
 const OrderItem = () => {
@@ -40,16 +40,16 @@ const OrderItem = () => {
     } catch (error) {
       console.error("🚨 Error updating item status:", error.response ? error.response.data : error);
     }
-};
+  };
 
 
   return (
     <div className="order-container">
-      
+
       <IconButton
         variant="outlined"
         color="secondary"
-        onClick={() => navigate('/order')} 
+        onClick={() => navigate('/order')}
         sx={{ marginBottom: 2 }}
       >
         ⬅️
@@ -99,7 +99,7 @@ const OrderItem = () => {
             )}
           </TableBody>
         </Table>
-        
+
       </TableContainer>
     </div>
   );

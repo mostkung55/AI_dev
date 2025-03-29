@@ -84,11 +84,11 @@ exports.getAllProducts = async (req, res) => {
 
 // READ: ดึงข้อมูลสินค้าตาม ID
 exports.getProductById = async (req, res) => {
-     
+
     try {
         const { id } = req.params;
         const [product] = await db.query("SELECT * FROM Product WHERE Product_ID = ?", id);
-       
+
         if (product.length === 0) {
             return res.status(404).json({ message: "Product not found" });
         }
@@ -150,11 +150,11 @@ exports.deleteProduct = async (req, res) => {
             return res.status(404).json({ message: "Product not found" });
         }
         res.status(200).json({ message: "Product deleted successfully" });
-        
+
     } catch (error) {
         console.log(error)
     }
-    
+
 };
 
 exports.generateProductMenu = async () => {
@@ -175,7 +175,7 @@ exports.generateProductMenu = async () => {
                     type: "bubble",
                     hero: {
                         type: "image",
-                        url: `https://9d33-58-8-92-226.ngrok-free.app${product.Product_image}`,
+                        url: `https://29e9-58-8-94-90.ngrok-free.app${product.Product_image}`,
                         size: "full",
                         aspectRatio: "20:13",
                         aspectMode: "cover"

@@ -31,8 +31,8 @@ exports.getItem = async (req, res) => {
                    Order_Item.Order_ItemID
             FROM Order_Item
             JOIN Product ON Order_Item.Product_ID = Product.Product_ID
-            WHERE Order_Item.Order_ID = ?`, [orderId]); 
-        
+            WHERE Order_Item.Order_ID = ?`, [orderId]);
+
         console.log("📢 Order Items:", items);
         res.status(200).json(items);
     } catch (error) {
@@ -45,13 +45,13 @@ exports.sendNotification = async (orderId) => {
     try {
         //  ดึงข้อมูลลูกค้า (เช่น LINE User ID) จากฐานข้อมูล
         const [order] = await db.query("SELECT Customer_ID, status FROM `Order` WHERE Order_ID = ?", [orderId]);
-        
+
         if (order.length === 0) {
             console.error(`❌ Order ID ${orderId} not found!`);
             return;
         }
 
-        const customerId = order[0].Customer_ID; 
+        const customerId = order[0].Customer_ID;
 
         const message = {
             to: customerId,
@@ -132,7 +132,7 @@ const notifyCustomer = async (customerId, status, orderId) => {
             message = "🚚 คำสั่งซื้อของคุณกำลังถูกจัดส่ง!";
             break;
         case "Paid":
-            message = "💰 คำสั่งซื้อของคุณถูกชำระเงินเรียบร้อยแล้ว!";
+            message = "💰 คำสั่งซื้อของคุณถูกชำระเงินเรียบร้อยแล้ว! ขอบคุณครับ🙏";
             break;
         default:
             message = `📢 คำสั่งซื้อของคุณเปลี่ยนสถานะเป็น: ${status}`;
@@ -204,13 +204,13 @@ exports.updateItemStatus = async (req, res) => {
         }
 
         console.log(`✅ อัปเดตสถานะของ Order ${orderId} เป็น ${newOrderStatus}`);
-        
+
         //  อัปเดตสถานะของ Order
         await db.query("UPDATE `Order` SET status = ? WHERE Order_ID = ?", [newOrderStatus, orderId]);
 
         //  ส่งแจ้งเตือนลูกค้าเมื่อ **ทุก OrderItem เปลี่ยนสถานะเดียวกัน**
         if (statuses.every(s => s === newOrderStatus)) {
-            await notifyCustomer(customerId, newOrderStatus, orderId); 
+            await notifyCustomer(customerId, newOrderStatus, orderId);
         }
 
 

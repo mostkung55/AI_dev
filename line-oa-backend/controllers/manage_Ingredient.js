@@ -4,52 +4,94 @@ const app = express();
 const cors = require("cors");
 require('dotenv').config();
 const axios = require("axios");
+const fs = require("fs");
+const path = require("path");
+const { spawn } = require("child_process");
+const { error } = require("console");
 
-exports.createIngredient = async (req, res) => {
-    try {
-        console.log("📢 ข้อมูลที่ได้รับจาก React:", req.body);
+// POST: อัปโหลดภาพใบเสร็จและเพิ่ม stock
+exports.uploadReceiptSlip = async (req, res) => {
+    const imagePath = req.file.path;
+    const scriptPath = path.join(__dirname, "..", "model", "run_gemini.py");
+    const python = spawn("python", [scriptPath, imagePath]);
 
-        const { Ingredient_Name, Quantity, Low_stock_threshold, EXP_date, Price } = req.body;
+    let stdout = "";
+    let stderr = "";
 
-        if (!Ingredient_Name || Quantity === undefined || Low_stock_threshold === undefined || !EXP_date || Price === undefined) {
-            return res.status(400).json({ message: "กรุณากรอกข้อมูลให้ครบถ้วน" });
+    python.stdout.on("data", (data) => {
+        stdout += data.toString();
+    });
+
+    python.stderr.on("data", (data) => {
+        stderr += data.toString();
+    });
+
+    python.on("close", async (code) => {
+        if (code !== 0) {
+            console.error("❌ Python Error:", stderr.slice(0, 1000));
+            return res.status(500).json({ message: "เกิดข้อผิดพลาดจาก Python" });
         }
 
-        //  ตรวจสอบว่า Ingredient มีอยู่แล้วหรือไม่
-        const [existingIngredient] = await db.query(
-            "SELECT Ingredient_ID, Quantity FROM Ingredient WHERE Ingredient_Name = ?",
-            [Ingredient_Name]
-        );
+        try {
+            const jsonStart = stdout.indexOf("{");
+            if (jsonStart === -1) throw new Error("No JSON found in output");
 
-        let ingredientId;
-        if (existingIngredient.length > 0) {
-            ingredientId = existingIngredient[0].Ingredient_ID;
-            const newTotalQuantity = Number(existingIngredient[0].Quantity) + Number(Quantity);
+            const cleaned = stdout.slice(jsonStart).replace(/```json|```/g, "").trim();
+            const data = JSON.parse(cleaned);
 
-            await db.query(
-                "UPDATE Ingredient SET Quantity = ? WHERE Ingredient_ID = ?",
-                [newTotalQuantity, ingredientId]
-            );
-        } else {
-            const sqlInsertIngredient = "INSERT INTO Ingredient (Ingredient_Name, Quantity, Low_stock_threshold) VALUES (?, ?, ?)";
-            const [result] = await db.query(sqlInsertIngredient, [Ingredient_Name, Quantity, Low_stock_threshold]);
-            ingredientId = result.insertId;
+            const { date, detail } = data;
+            const insertResults = [];
+
+            for (const item of detail) {
+                const { name, quantity, price } = item;
+
+                // ✅ ค้นหาวัตถุดิบ
+                const [existingIngredient] = await db.query(
+                    "SELECT Ingredient_ID, Quantity FROM Ingredient WHERE Ingredient_Name = ?",
+                    [name]
+                );
+
+                let ingredientId;
+                if (existingIngredient.length > 0) {
+                    ingredientId = existingIngredient[0].Ingredient_ID;
+                    const newTotalQuantity = Number(existingIngredient[0].Quantity) + Number(quantity);
+
+                    await db.query(
+                        "UPDATE Ingredient SET Quantity = ? WHERE Ingredient_ID = ?",
+                        [newTotalQuantity, ingredientId]
+                    );
+                } else {
+                    const insertIngredientSql = `
+                        INSERT INTO Ingredient (Ingredient_Name, Quantity, Low_stock_threshold)
+                        VALUES (?, ?, ?)
+                    `;
+                    const [result] = await db.query(insertIngredientSql, [name, quantity, 1]);
+                    ingredientId = result.insertId;
+                }
+
+                // ✅ เพิ่มลง Ingredient_Item
+                const batchCode = `BATCH-${ingredientId}-${Date.now()}`;
+                const insertItemSql = `
+                    INSERT INTO Ingredient_Item (Ingredient_ID, Batch_code, Quantity, Price, Updated_at)
+                    VALUES (?, ?, ?, ?, NOW())
+                `;
+                await db.query(insertItemSql, [ingredientId, batchCode, quantity, price, date]);
+
+                insertResults.push({ name, quantity, price, ingredientId });
+            }
+
+            return res.status(201).json({
+                message: "✅ เพิ่มวัตถุดิบจากใบเสร็จสำเร็จ",
+                inserted: insertResults,
+            });
+
+        } catch (err) {
+            console.error("❌ JSON Parse or DB Error:", err);
+            console.log("📤 Raw Output:", stdout);
+            return res.status(500).json({ message: "ไม่สามารถแปลงผลลัพธ์จาก Gemini เป็น JSON ได้", error });
         }
-
-        //  เพิ่มราคาใน Ingredient_Item
-        const batchCode = `BATCH-${ingredientId}-${Date.now()}`;
-        const sqlInsertBatch = "INSERT INTO Ingredient_Item (Ingredient_ID, Batch_code, Quantity, EXP_date, Price, Updated_at) VALUES (?, ?, ?, ?, ?, NOW())";
-        await db.query(sqlInsertBatch, [ingredientId, batchCode, Quantity, EXP_date, Price]);
-
-        res.status(201).json({ message: "เพิ่มวัตถุดิบสำเร็จ!", ingredientId });
-
-    } catch (error) {
-        console.error("🚨 เพิ่มวัตถุดิบไม่สำเร็จ:", error);
-        res.status(500).json({ message: "เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์" });
-    }
+    });
 };
-
-
 
 
 
@@ -104,5 +146,6 @@ exports.deleteIngredient = async (req, res) => {
         res.status(500).json({ message: "เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์" });
     }
 };
+
 
 

@@ -44,6 +44,23 @@ exports.getIngredientItems = async (req, res) => {
     }
 };
 
+exports.updateExpDate = async (req, res) => {
+    const { batch_code, exp_date } = req.body;
+    if (!batch_code || !exp_date) {
+        return res.status(400).json({ message: "กรุณาระบุ batch_code และ exp_date" });
+    }
+
+    try {
+        const sql = `UPDATE Ingredient_Item SET EXP_date = ? WHERE Batch_code = ?`;
+        await db.query(sql, [exp_date, batch_code]);
+        res.status(200).json({ message: "อัปเดตวันหมดอายุสำเร็จ" });
+    } catch (err) {
+        console.error("❌ อัปเดตวันหมดอายุล้มเหลว:", err);
+        res.status(500).json({ message: "เกิดข้อผิดพลาดในการอัปเดต" });
+    }
+};
+
+
 
 
 
