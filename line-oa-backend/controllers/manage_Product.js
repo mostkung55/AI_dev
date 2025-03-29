@@ -30,7 +30,7 @@ exports.createProduct = async (req, res) => {
         }
 
         const imagePath = `/uploads/${req.file.filename}`;
-        const ingredientsJson = JSON.stringify(ingredients); // ✅ แปลง JSON ก่อนบันทึก
+        const ingredientsJson = JSON.stringify(ingredients); //  แปลง JSON ก่อนบันทึก
 
         const sql = "INSERT INTO Product (Product_Name, Price, Description, Product_image, Ingredients) VALUES (?, ?, ?, ?, ?)";
         const [result] = await db.query(sql, [name, price, description, imagePath, ingredientsJson]);
@@ -49,7 +49,7 @@ exports.getAllProducts = async (req, res) => {
         const sql = "SELECT * FROM Product";
         const [products] = await db.query(sql);
 
-        // ✅ ตรวจสอบค่า Ingredients ก่อน `JSON.parse()`
+        //  ตรวจสอบค่า Ingredients ก่อน `JSON.parse()`
         const updatedProducts = products.map(p => {
             console.log("🔍 ค่าที่ได้จาก Database:", p.Ingredients);
 
@@ -58,12 +58,12 @@ exports.getAllProducts = async (req, res) => {
             if (p.Ingredients) {
                 if (typeof p.Ingredients === "string") {
                     try {
-                        ingredientsArray = JSON.parse(p.Ingredients); // ✅ แปลงเฉพาะถ้าเป็น String
+                        ingredientsArray = JSON.parse(p.Ingredients); //  แปลงเฉพาะถ้าเป็น String
                     } catch (error) {
                         console.error("🚨 JSON Parse Error:", error);
                     }
                 } else if (typeof p.Ingredients === "object") {
-                    ingredientsArray = p.Ingredients; // ✅ ถ้าเป็น Object อยู่แล้ว ไม่ต้องแปลง
+                    ingredientsArray = p.Ingredients; //  ถ้าเป็น Object อยู่แล้ว ไม่ต้องแปลง
                 }
             }
 
@@ -102,7 +102,7 @@ exports.getProductById = async (req, res) => {
 exports.updateProduct = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, price, description, ingredients } = req.body; // ✅ รับ ingredients จาก request
+        const { name, price, description, ingredients } = req.body; //  รับ ingredients จาก request
 
         // 🔹 ดึงค่ารูปภาพปัจจุบันจากฐานข้อมูลก่อน
         const [existingProduct] = await db.query("SELECT Product_image FROM Product WHERE Product_ID = ?", [id]);
@@ -114,13 +114,13 @@ exports.updateProduct = async (req, res) => {
         let imagePath = existingProduct[0].Product_image; // ใช้ค่ารูปเดิมถ้าไม่ได้อัปโหลดใหม่
 
         if (req.file) {
-            imagePath = `/uploads/${req.file.filename}`; // ✅ ใช้รูปใหม่ถ้ามีการอัปโหลด
+            imagePath = `/uploads/${req.file.filename}`; //  ใช้รูปใหม่ถ้ามีการอัปโหลด
         }
 
-        // ✅ แปลง Ingredients เป็น JSON String
+        //  แปลง Ingredients เป็น JSON String
         const ingredientsJSON = ingredients ? JSON.stringify(JSON.parse(ingredients)) : null;
 
-        // 🔹 อัปเดตข้อมูลสินค้า
+        //  อัปเดตข้อมูลสินค้า
         const sql = "UPDATE Product SET Product_Name = ?, Price = ?, Description = ?, Product_image = ?, Ingredients = ? WHERE Product_ID = ?";
         const [product] = await db.query(sql, [name, price, description, imagePath, ingredientsJSON, id]);
 
@@ -162,10 +162,10 @@ exports.generateProductMenu = async () => {
         const [products] = await db.query("SELECT Product_Name, Price, Description, Product_image FROM Product LIMIT 6");
 
         if (products.length === 0) {
-            return null; // 🔹 ถ้าไม่มีสินค้าให้คืนค่า `null`
+            return null; //  ถ้าไม่มีสินค้าให้คืนค่า `null`
         }
 
-        // 🔹 สร้าง Flex Message
+        //  สร้าง Flex Message
         const flexMessage = {
             type: "flex",
             altText: "เมนูสินค้าใหม่วันนี้",
@@ -235,7 +235,7 @@ exports.sendProductsToLine = async (req, res = null) => {
             return res.status(404).json({ message: "❌ ไม่มีลูกค้าในระบบ" });
         }
 
-        // 🔹 ส่งเมนูให้ลูกค้าทุกคน
+        //  ส่งเมนูให้ลูกค้าทุกคน
         for (const recipient of recipients) {
             console.log(`📤 ส่งถึง: ${recipient.Customer_ID}`);
             await client.pushMessage(recipient.Customer_ID, flexMessage);

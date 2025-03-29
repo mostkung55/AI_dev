@@ -14,7 +14,7 @@ const config = {
 const client = new line.Client(config);
 
 
-// 📌 GET: ดึงรายการสินค้าใน Order ตาม Order_ID
+//  GET: ดึงรายการสินค้าใน Order ตาม Order_ID
 exports.getItem = async (req, res) => {
     try {
         const { orderId } = req.params;
@@ -40,10 +40,10 @@ exports.getItem = async (req, res) => {
         res.status(500).json({ message: "เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์" });
     }
 };
-// 📌 ฟังก์ชันส่งแจ้งเตือนการชำระเงินไปยังลูกค้า
+//  ฟังก์ชันส่งแจ้งเตือนการชำระเงินไปยังลูกค้า
 exports.sendNotification = async (orderId) => {
     try {
-        // 🔥 ดึงข้อมูลลูกค้า (เช่น LINE User ID) จากฐานข้อมูล
+        //  ดึงข้อมูลลูกค้า (เช่น LINE User ID) จากฐานข้อมูล
         const [order] = await db.query("SELECT Customer_ID, status FROM `Order` WHERE Order_ID = ?", [orderId]);
         
         if (order.length === 0) {
@@ -139,7 +139,7 @@ const notifyCustomer = async (customerId, status, orderId) => {
             break;
     }
 
-    // ✅ กรณี Completed ให้ข้ามการตรวจสอบ message ว่าง และส่ง Flex Message แทน
+    //  กรณี Completed ให้ข้ามการตรวจสอบ message ว่าง และส่ง Flex Message แทน
     if (status === "Completed") {
         console.log("✅ Sending payment notification for Completed status...");
         await exports.sendNotification(orderId);
@@ -160,7 +160,7 @@ const notifyCustomer = async (customerId, status, orderId) => {
 
 
 
-// 📌 PUT: อัปเดตสถานะของสินค้าใน Order Item และอัปเดตสถานะ Order
+//  PUT: อัปเดตสถานะของสินค้าใน Order Item และอัปเดตสถานะ Order
 exports.updateItemStatus = async (req, res) => {
     const { orderItemId } = req.params;
     const { status } = req.body;
@@ -168,29 +168,29 @@ exports.updateItemStatus = async (req, res) => {
     try {
         console.log(`🔄 อัปเดตสถานะของ Order_ItemID: ${orderItemId} เป็น ${status}`);
 
-        // ✅ อัปเดตสถานะของ Order Item
+        //  อัปเดตสถานะของ Order Item
         await db.query("UPDATE Order_Item SET Status = ? WHERE Order_ItemID = ?", [status, orderItemId]);
 
-        // ✅ ดึง Order ID ของ Order Item ที่อัปเดต
+        //  ดึง Order ID ของ Order Item ที่อัปเดต
         const [orderData] = await db.query("SELECT Order_ID FROM Order_Item WHERE Order_ItemID = ?", [orderItemId]);
         if (orderData.length === 0) {
             return res.status(404).json({ error: "Order item not found" });
         }
         const orderId = orderData[0].Order_ID;
 
-        // ✅ ดึง Customer_ID ของ Order
+        //  ดึง Customer_ID ของ Order
         const [customerData] = await db.query("SELECT Customer_ID FROM `Order` WHERE Order_ID = ?", [orderId]);
         if (customerData.length === 0) {
             return res.status(404).json({ error: "Customer not found" });
         }
         const customerId = customerData[0].Customer_ID;
 
-        // ✅ ดึงสถานะของ Order Items ทั้งหมดในคำสั่งซื้อนั้น
+        //  ดึงสถานะของ Order Items ทั้งหมดในคำสั่งซื้อนั้น
         const [items] = await db.query("SELECT Status FROM Order_Item WHERE Order_ID = ?", [orderId]);
         const statuses = items.map(item => item.Status);
         console.log(`📢 สถานะทั้งหมดของ Order ${orderId}:`, statuses);
 
-        // ✅ กำหนดสถานะใหม่ของ Order ตามสถานะของ Order Items
+        //  กำหนดสถานะใหม่ของ Order ตามสถานะของ Order Items
         let newOrderStatus = "Preparing";
 
         if (statuses.every(s => s === "Completed")) {
@@ -205,12 +205,12 @@ exports.updateItemStatus = async (req, res) => {
 
         console.log(`✅ อัปเดตสถานะของ Order ${orderId} เป็น ${newOrderStatus}`);
         
-        // ✅ อัปเดตสถานะของ Order
+        //  อัปเดตสถานะของ Order
         await db.query("UPDATE `Order` SET status = ? WHERE Order_ID = ?", [newOrderStatus, orderId]);
 
-        // ✅ ส่งแจ้งเตือนลูกค้าเมื่อ **ทุก OrderItem เปลี่ยนสถานะเดียวกัน**
+        //  ส่งแจ้งเตือนลูกค้าเมื่อ **ทุก OrderItem เปลี่ยนสถานะเดียวกัน**
         if (statuses.every(s => s === newOrderStatus)) {
-            await notifyCustomer(customerId, newOrderStatus, orderId); // ✅ เพิ่ม orderId
+            await notifyCustomer(customerId, newOrderStatus, orderId); 
         }
 
 
@@ -227,7 +227,7 @@ exports.updateItemStatus = async (req, res) => {
 
 
 
-// 📌 PUT: อัปเดตสถานะของ Order
+//  PUT: อัปเดตสถานะของ Order
 exports.updateOrderStatus = async (req, res) => {
     try {
         const { orderId } = req.params;
@@ -237,10 +237,10 @@ exports.updateOrderStatus = async (req, res) => {
             return res.status(400).json({ message: "กรุณาระบุ Status" });
         }
 
-        // ✅ อัปเดต Status ของ Order
+        //  อัปเดต Status ของ Order
         await db.query("UPDATE `Order` SET Status = ? WHERE Order_ID = ?", [status, orderId]);
 
-        // ✅ เรียกฟังก์ชันแจ้งเตือนลูกค้าเมื่อสถานะเป็น "Completed"
+        //  เรียกฟังก์ชันแจ้งเตือนลูกค้าเมื่อสถานะเป็น "Completed"
         if (status === "Completed") {
             console.log("📌 Order Completed! กำลังแจ้งเตือนลูกค้า...");
             await exports.sendNotification(orderId);

@@ -15,7 +15,7 @@ exports.createIngredient = async (req, res) => {
             return res.status(400).json({ message: "กรุณากรอกข้อมูลให้ครบถ้วน" });
         }
 
-        // ✅ ตรวจสอบว่า Ingredient มีอยู่แล้วหรือไม่
+        //  ตรวจสอบว่า Ingredient มีอยู่แล้วหรือไม่
         const [existingIngredient] = await db.query(
             "SELECT Ingredient_ID, Quantity FROM Ingredient WHERE Ingredient_Name = ?",
             [Ingredient_Name]
@@ -36,7 +36,7 @@ exports.createIngredient = async (req, res) => {
             ingredientId = result.insertId;
         }
 
-        // ✅ เพิ่มราคาใน Ingredient_Item
+        //  เพิ่มราคาใน Ingredient_Item
         const batchCode = `BATCH-${ingredientId}-${Date.now()}`;
         const sqlInsertBatch = "INSERT INTO Ingredient_Item (Ingredient_ID, Batch_code, Quantity, EXP_date, Price, Updated_at) VALUES (?, ?, ?, ?, ?, NOW())";
         await db.query(sqlInsertBatch, [ingredientId, batchCode, Quantity, EXP_date, Price]);
@@ -90,11 +90,11 @@ exports.deleteIngredient = async (req, res) => {
     try {
         const { id } = req.params;
 
-        // ✅ ลบจาก Ingredient_Item ก่อน
+        //  ลบจาก Ingredient_Item ก่อน
         const sqlDeleteItems = "DELETE FROM Ingredient_Item WHERE Ingredient_ID = ?";
         await db.query(sqlDeleteItems, [id]);
 
-        // ✅ ลบจาก Ingredient
+        //  ลบจาก Ingredient
         const sqlDeleteIngredient = "DELETE FROM Ingredient WHERE Ingredient_ID = ?";
         await db.query(sqlDeleteIngredient, [id]);
 

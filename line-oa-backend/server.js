@@ -91,7 +91,7 @@ app.post("/webhook", async (req, res) => {
             let customerName = "ลูกค้า";
 
             try {
-                // ✅ ตรวจสอบว่าลูกค้ากำลังพิมพ์ที่อยู่หรือไม่
+                //  ตรวจสอบว่าลูกค้ากำลังพิมพ์ที่อยู่หรือไม่
                 const [waitingOrder] = await db.query(
                     "SELECT Order_ID FROM `Order` WHERE Customer_ID = ? AND Status = 'Awaiting Address'",
                     [customerId]
@@ -100,13 +100,13 @@ app.post("/webhook", async (req, res) => {
                 if (waitingOrder.length > 0) {
                     let orderId = waitingOrder[0].Order_ID;
 
-                    // ✅ บันทึกที่อยู่ลงใน Order
+                    //  บันทึกที่อยู่ลงใน Order
                     await db.query(
                         "UPDATE `Order` SET Customer_Address = ?, Status = 'Preparing' WHERE Order_ID = ?",
                         [customerText, orderId]
                     );
 
-                    // ✅ แจ้งลูกค้าว่าที่อยู่ถูกบันทึกแล้ว
+                    //  แจ้งลูกค้าว่าที่อยู่ถูกบันทึกแล้ว
                     await client.replyMessage(event.replyToken, {
                         type: "text",
                         text: `✅ ที่อยู่ของคุณถูกบันทึกเรียบร้อยแล้ว!\n📍 ที่อยู่: ${customerText}\n🛵 กำลังเตรียมคำสั่งซื้อของคุณ`
@@ -115,20 +115,20 @@ app.post("/webhook", async (req, res) => {
                     return;
                 }
 
-                // ✅ ดึงข้อมูลโปรไฟล์ลูกค้า
+                //  ดึงข้อมูลโปรไฟล์ลูกค้า
                 const profile = await getUserProfile(customerId);
                 if (profile) {
                     customerName = profile.displayName;
                 }
 
-                // ✅ บันทึกลูกค้า (ถ้ายังไม่มี)
+                //  บันทึกลูกค้า (ถ้ายังไม่มี)
                 await db.query(
                     `INSERT INTO Customer (Customer_ID, Customer_Name) VALUES (?, ?) 
                      ON DUPLICATE KEY UPDATE Customer_Name = VALUES(Customer_Name)`,
                     [customerId, customerName]
                 );
 
-                // ✅ เรียกโมเดล Python
+                //  เรียกโมเดล Python
                 const modelPath = path.join(__dirname, "..", "model", "model.py");
                 exec(`python "${modelPath}" "${customerText}"`, async (error, stdout) => {
                     if (error) {
@@ -172,7 +172,7 @@ app.post("/webhook", async (req, res) => {
                         });
                     }
 
-                    // ✅ สร้าง Flex Message ให้ลูกค้ายืนยัน (แต่ยังไม่บันทึกลง Database)
+                    //  สร้าง Flex Message ให้ลูกค้ายืนยัน (แต่ยังไม่บันทึกลง Database)
                     const confirmMessage = {
                         type: "flex",
                         altText: "กรุณายืนยันคำสั่งซื้อ",
@@ -221,7 +221,7 @@ app.post("/webhook", async (req, res) => {
                         }
                     };
 
-                    // ✅ ส่ง Flex Message ให้ลูกค้ากดยืนยัน
+                    //  ส่ง Flex Message ให้ลูกค้ากดยืนยัน
                     await client.replyMessage(event.replyToken, confirmMessage);
                 });
 
@@ -258,7 +258,7 @@ app.post("/webhook", async (req, res) => {
                 });
         }
         
-        // ✅ ตรวจจับเมื่อมีการกดปุ่ม Confirm หรือ Cancel
+        //  ตรวจจับเมื่อมีการกดปุ่ม Confirm หรือ Cancel
         else if (event.type === "postback") {
             let data;
             try {
@@ -271,7 +271,7 @@ app.post("/webhook", async (req, res) => {
         
             if (data.action === "confirm_order") {
                 try {
-                    // ✅ ตรวจสอบวัตถุดิบก่อน
+                    //  ตรวจสอบวัตถุดิบก่อน
                     const ingredientCheck = await checkIngredientsAvailability(data.orderItems);
                     if (!ingredientCheck.success) {
                         await client.replyMessage(event.replyToken, {
@@ -281,14 +281,14 @@ app.post("/webhook", async (req, res) => {
                         return;
                     }
             
-                    // ✅ บันทึก Order ลงฐานข้อมูล
+                    // บันทึก Order ลงฐานข้อมูล
                     const [orderResult] = await db.query(
                         "INSERT INTO `Order` (Customer_ID, Total_Amount, Customer_Address, Status) VALUES (?, ?, NULL, 'Awaiting Address')",
                         [data.customerId, data.totalAmount]
                     );
                     const orderId = orderResult.insertId;
             
-                    // ✅ บันทึก Order Items
+                    //  บันทึก Order Items
                     for (let item of data.orderItems) {
                         await db.query(
                             "INSERT INTO Order_Item (Order_ID, Product_ID, Quantity, Subtotal, Status) VALUES (?, ?, ?, ?, 'Preparing')",
@@ -296,10 +296,10 @@ app.post("/webhook", async (req, res) => {
                         );
                     }
             
-                    // ✅ หักสต็อกวัตถุดิบ
+                    //  หักสต็อกวัตถุดิบ
                     await deductIngredientsFromStock(data.orderItems);
             
-                    // ✅ แจ้งลูกค้าให้ส่งที่อยู่
+                    //  แจ้งลูกค้าให้ส่งที่อยู่
                     await client.replyMessage(event.replyToken, {
                         type: "text",
                         text: "✅ คำสั่งซื้อของคุณได้รับการยืนยันแล้ว!\n📍 กรุณาส่งที่อยู่สำหรับจัดส่งสินค้าของคุณ"
@@ -311,7 +311,7 @@ app.post("/webhook", async (req, res) => {
                 }
             }
             else if (data.action === "cancel_order") {
-                // ✅ ส่งข้อความใหม่แทนปุ่ม
+                //  ส่งข้อความใหม่แทนปุ่ม
                 await client.replyMessage(event.replyToken, {
                     type: "text",
                     text: "❌ คำสั่งซื้อของคุณถูกยกเลิกเรียบร้อยแล้ว"
@@ -397,7 +397,7 @@ const verifySlip = async (imageId, orderId, customerId) => {
             return "❌ ไม่สามารถดาวน์โหลดรูปภาพได้ กรุณาส่งใหม่";
         }
 
-        // ✅ ดึงยอดเงินจากฐานข้อมูล
+        //  ดึงยอดเงินจากฐานข้อมูล
         const [order] = await db.query(
             "SELECT Total_Amount FROM `Order` WHERE Order_ID = ?",
             [orderId]
@@ -414,7 +414,7 @@ const verifySlip = async (imageId, orderId, customerId) => {
             return "❌ ไม่สามารถดึงยอดที่ต้องชำระได้ กรุณาลองใหม่";
         }
 
-        // ✅ ส่งยอดเงินไปใน request ของ SlipOK
+        //  ส่งยอดเงินไปใน request ของ SlipOK
         const formData = new FormData();
         formData.append("files", fs.createReadStream(imagePath));
         formData.append("log", "true");
@@ -436,7 +436,7 @@ const verifySlip = async (imageId, orderId, customerId) => {
         
         fs.unlinkSync(imagePath);
 
-        // ✅ ตรวจสอบสลิปสำเร็จ
+        //  ตรวจสอบสลิปสำเร็จ
         if (response.data.success) {
             const slipAmount = response.data.data.amount;
 
@@ -456,7 +456,7 @@ const verifySlip = async (imageId, orderId, customerId) => {
             let errorMessage = response.data.message || "มีข้อผิดพลาดในการตรวจสอบสลิป";
             const slipAmount = response.data.data?.amount || "ไม่ระบุ";
 
-            // ✅ กำหนดข้อความสำรองถ้า message ว่าง
+            //  กำหนดข้อความสำรองถ้า message ว่าง
             if (!errorMessage || errorMessage.trim() === "") {
                 console.error("❌ Message cannot be empty");
                 errorMessage = "มีข้อผิดพลาดในการตรวจสอบสลิป กรุณาลองใหม่อีกครั้ง";
@@ -473,7 +473,7 @@ const verifySlip = async (imageId, orderId, customerId) => {
         if (error.response) {
             let errorMessage = error.response.data.message || "มีข้อผิดพลาดในการตรวจสอบสลิป";
 
-            // ✅ กำหนดข้อความสำรองถ้า message ว่าง
+            //  กำหนดข้อความสำรองถ้า message ว่าง
             if (!errorMessage || errorMessage.trim() === "") {
                 console.error("❌ Message cannot be empty");
                 errorMessage = "มีข้อผิดพลาดในการตรวจสอบสลิป กรุณาลองใหม่อีกครั้ง";

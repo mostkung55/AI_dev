@@ -29,7 +29,7 @@ exports.getIngredientItems = async (req, res) => {
 
         const [ingredientItems] = await db.query(sql, [ingredient_id]);
 
-        // ✅ ตรวจสอบว่ามี Price หรือไม่
+        //  ตรวจสอบว่ามี Price หรือไม่
         const result = ingredientItems.map(item => ({
             ...item,
             Price: Number(item.Price) || 0

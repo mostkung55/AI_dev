@@ -4,7 +4,7 @@
 
 .back-button-container {
     display: flex;
-    justify-content: flex-start; /* ✅ ปรับให้ปุ่มอยู่ชิดซ้าย */
+    justify-content: flex-start; 
     align-items: center;
     margin-bottom: 16px;
 }

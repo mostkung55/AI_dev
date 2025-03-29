@@ -4,18 +4,18 @@ import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContai
 import dayjs from "dayjs";
 import axios from "axios";
 
-// ✅ Mock Data สำหรับการทดสอบ
+//  Mock Data สำหรับการทดสอบ
 const mockData = {
   dailySales: Array.from({ length: 30 }, (_, i) => ({
-    day: dayjs().add(i, 'day').format("YYYY-MM-DD"), // ✅ รูปแบบ YYYY-MM-DD
+    day: dayjs().add(i, 'day').format("YYYY-MM-DD"), 
     sales: Math.floor(Math.random() * 500) + 100
   })),
   weeklySales: Array.from({ length: 7 }, (_, i) => ({
-    week: `Week ${i + 1}`, // ✅ ใช้ Week + หมายเลข
+    week: `Week ${i + 1}`, 
     sales: Math.floor(Math.random() * 3000) + 1000
   })),
   monthlySales: Array.from({ length: 12 }, (_, i) => ({
-    month: dayjs().month(i).format('MMMM'), // ✅ ใช้ชื่อเดือนเต็ม (Jan, Feb, ... )
+    month: dayjs().month(i).format('MMMM'), 
     sales: Math.floor(Math.random() * 15000) + 5000
   }))
 };
@@ -60,21 +60,21 @@ const Dashboard = () => {
     try {
       const res = await axios.get("http://localhost:3000/api/dashboard/sales-data");
   
-      // ✅ อัปเดตข้อมูลสรุป รวมถึงต้นทุน และกำไร
+      //  อัปเดตข้อมูลสรุป รวมถึงต้นทุน และกำไร
       setSummary(prev => ({
         ...prev,
         totalCost: res.data.totalCost || 0,
         profit: res.data.profit || 0
       }));
   
-      // ✅ อัปเดตข้อมูลกราฟ
+      //  อัปเดตข้อมูลกราฟ
       setDailySales(res.data.dailySales || mockData.dailySales);
       setWeeklySales(res.data.weeklySales || mockData.weeklySales);
       setMonthlySales(res.data.monthlySales || mockData.monthlySales);
     } catch (error) {
       console.error("🚨 Error loading sales data:", error);
   
-      // ✅ ใช้ Mock Data ถ้าดึงข้อมูลล้มเหลว
+      //  ใช้ Mock Data ถ้าดึงข้อมูลล้มเหลว
       setDailySales(mockData.dailySales);
       setWeeklySales(mockData.weeklySales);
       setMonthlySales(mockData.monthlySales);
@@ -93,7 +93,7 @@ const Dashboard = () => {
       {/* 🔹 Section: Sales Summary */}
                
           <Grid container spacing={2} justifyContent="center">
-              {/* ✅ ยอดขายรวม */}
+              {/*  ยอดขายรวม */}
               <Grid item xs={12} sm={3}>
                   <Paper sx={{ padding: 3, textAlign: "center", borderRadius: 2, boxShadow: 2 }}>
                       <Typography variant="h6" color="textSecondary">ยอดขายรวม</Typography>
@@ -103,7 +103,7 @@ const Dashboard = () => {
                   </Paper>
               </Grid>
 
-              {/* ✅ จำนวนออเดอร์ */}
+              {/*  จำนวนออเดอร์ */}
               <Grid item xs={12} sm={3}>
                   <Paper sx={{ padding: 3, textAlign: "center", borderRadius: 2, boxShadow: 2 }}>
                       <Typography variant="h6" color="textSecondary">จำนวนออเดอร์</Typography>
@@ -113,7 +113,7 @@ const Dashboard = () => {
                   </Paper>
               </Grid>
 
-              {/* ✅ ต้นทุนรวม */}
+              {/*  ต้นทุนรวม */}
               <Grid item xs={12} sm={3}>
                   <Paper sx={{ padding: 3, textAlign: "center", borderRadius: 2, boxShadow: 2 }}>
                       <Typography variant="h6" color="textSecondary">ต้นทุนรวม</Typography>
@@ -127,7 +127,7 @@ const Dashboard = () => {
                   </Paper>
               </Grid>
 
-              {/* ✅ กำไรสุทธิ */}
+              {/*  กำไรสุทธิ */}
               <Grid item xs={12} sm={3}>
                   <Paper sx={{ padding: 3, textAlign: "center", borderRadius: 2, boxShadow: 2 }}>
                       <Typography variant="h6" color="textSecondary">กำไรสุทธิ</Typography>
@@ -144,9 +144,9 @@ const Dashboard = () => {
 
       
 
-      {/* 🔹 Section: Charts */}
+      {/*  Section: Charts */}
       <Grid container spacing={3} sx={{ marginTop: 4 }}>
-        {/* 🔸 ยอดขายต่อวัน */}
+        {/*  ยอดขายต่อวัน */}
         <Grid item xs={12}>
           <Typography variant="h6" fontWeight="bold">ยอดขายต่อวัน</Typography>
           <Paper sx={{ padding: 2, borderRadius: 2, boxShadow: 2 }}>
@@ -162,7 +162,7 @@ const Dashboard = () => {
           </Paper>
         </Grid>
 
-        {/* 🔸 ยอดขายต่อสัปดาห์ */}
+        {/*  ยอดขายต่อสัปดาห์ */}
         <Grid item xs={12} sm={6}>
           <Typography variant="h6" fontWeight="bold">ยอดขายต่อสัปดาห์</Typography>
           <Paper sx={{ padding: 2, borderRadius: 2, boxShadow: 2 }}>
@@ -178,7 +178,7 @@ const Dashboard = () => {
           </Paper>
         </Grid>
 
-        {/* 🔸 ยอดขายต่อเดือน */}
+        {/*  ยอดขายต่อเดือน */}
         <Grid item xs={12} sm={6}>
           <Typography variant="h6" fontWeight="bold">ยอดขายต่อเดือน</Typography>
           <Paper sx={{ padding: 2, borderRadius: 2, boxShadow: 2 }}>

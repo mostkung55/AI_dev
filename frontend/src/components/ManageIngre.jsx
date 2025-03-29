@@ -17,7 +17,7 @@ import {
 import { Delete, Edit, Add } from "@mui/icons-material";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import ListAltIcon from "@mui/icons-material/ListAlt"; // ✅ นำเข้าไอคอน
+import ListAltIcon from "@mui/icons-material/ListAlt"; 
 
 
 const ManageIngre = () => {
@@ -39,10 +39,10 @@ const ManageIngre = () => {
     try {
         const res = await axios.get("http://localhost:3000/api/ingredient");
 
-        // ✅ ตรวจสอบและกำหนดค่า isLowStock ใหม่
+        //  ตรวจสอบและกำหนดค่า isLowStock ใหม่
         const updatedIngredients = res.data.map(ingre => ({
             ...ingre,
-            isLowStock: Number(ingre.Quantity) < Number(ingre.Low_stock_threshold), // ✅ คำนวณใหม่ทุกครั้ง
+            isLowStock: Number(ingre.Quantity) < Number(ingre.Low_stock_threshold), //  คำนวณใหม่ทุกครั้ง
         }));
         setIngredients(updatedIngredients);
     } catch (error) {
@@ -52,7 +52,7 @@ const ManageIngre = () => {
 
 
 const handleAddIngredient = async () => {
-  if (!ingreName || !ingreUnit || !expDate) {  // ⏳ เพิ่มเงื่อนไขให้ต้องกรอก EXP_date
+  if (!ingreName || !ingreUnit || !expDate) {  
       alert("กรุณากรอกข้อมูลให้ครบ");
       return;
   }
@@ -62,13 +62,13 @@ const handleAddIngredient = async () => {
           Ingredient_Name: ingreName,  
           Quantity: parseInt(ingreUnit, 10),
           Low_stock_threshold: parseInt(lowStockThreshold, 10) || 5, 
-          EXP_date: expDate, // ⏳ ส่งค่า EXP_date ไปยัง Backend
-          Price: parseFloat(price), // ✅ ส่งข้อมูล Price ไป Backend
+          EXP_date: expDate, //  ส่งค่า EXP_date ไปยัง Backend
+          Price: parseFloat(price), //  ส่งข้อมูล Price ไป Backend
       });
 
       setIngreName("");
       setIngreUnit("");
-      setExpDate("");  // ⏳ รีเซ็ตค่า EXP_date หลังจากเพิ่มข้อมูล
+      setExpDate("");  //  รีเซ็ตค่า EXP_date หลังจากเพิ่มข้อมูล
       setOpen(false);
       loadIngredients();
   } catch (error) {

@@ -11,8 +11,8 @@ import {
   IconButton,
   Select,
   MenuItem,
-  Switch, // ✅ เพิ่ม Switch
-  FormControlLabel // ✅ เพิ่ม FormControlLabel
+  Switch, 
+  FormControlLabel 
 } from "@mui/material";
 import { Delete, ListAlt as ListAltIcon } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom"; 
@@ -33,7 +33,7 @@ const ManageOrder = () => {
     try {
         const res = await axios.get("http://localhost:3000/api/orders");
 
-        // ✅ แยกคำสั่งซื้อที่เป็น "Paid" ออกจากรายการหลัก
+        //  แยกคำสั่งซื้อที่เป็น "Paid" ออกจากรายการหลัก
         const paid = res.data.filter(order => order.Status?.trim().toLowerCase() === "paid");
         const notPaid = res.data.filter(order => order.Status?.trim().toLowerCase() !== "paid");
 

@@ -15,7 +15,7 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import axios from "axios";
 import moment from "moment-timezone";
 const IngredientItem = () => {
-    const location = useLocation(); // ✅ ใช้เพื่อดึงข้อมูลจาก URL
+    const location = useLocation(); //  ใช้เพื่อดึงข้อมูลจาก URL
     const queryParams = new URLSearchParams(location.search);
     const ingredientId = queryParams.get("ingredient_id"); 
     const ingredientName = queryParams.get("ingredient_name");
@@ -41,7 +41,7 @@ const IngredientItem = () => {
 }, [ingredientId]);
 
 
-  // ✅ ฟังก์ชันแปลงรูปแบบวันที่ให้ดูง่ายขึ้น
+  //  ฟังก์ชันแปลงรูปแบบวันที่ให้ดูง่ายขึ้น
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
     const date = new Date(dateString);
@@ -49,7 +49,7 @@ const IngredientItem = () => {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
-    }) + ` (${date.toLocaleTimeString("en-GB")})`; // ✅ แสดงวันที่ + เวลาล่าสุด
+    }) + ` (${date.toLocaleTimeString("en-GB")})`; //  แสดงวันที่ + เวลาล่าสุด
   };
 
   return (
@@ -80,14 +80,14 @@ const IngredientItem = () => {
               <TableCell align="center">Quantity</TableCell>
               <TableCell align="center">Price</TableCell> 
               <TableCell align="center">Expiration Date</TableCell>
-              <TableCell align="center">Last Updated</TableCell> {/* ✅ แสดง Updated_at */}
+              <TableCell align="center">Last Updated</TableCell> 
             </TableRow>
           </TableHead>
 
           <TableBody>
                 {ingredientItems.map((item, index) => (
                     <TableRow key={item.Batch_code} style={{ background: "#f8f5e3" }}>
-                        <TableCell>{index + 1}</TableCell> {/* ✅ ใช้ index แทน "N/A" */}
+                        <TableCell>{index + 1}</TableCell>
                         <TableCell>{item.Batch_code ?? "N/A"}</TableCell>
                         <TableCell align="center">{item.Quantity ?? 0}</TableCell>
                         <TableCell align="center">{item.Price?.toFixed(2) ?? "N/A"}</TableCell> 

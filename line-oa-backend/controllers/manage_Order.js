@@ -9,7 +9,7 @@ const axios = require("axios");
 // GET: ดึงข้อมูลคำสั่งซื้อทั้งหมด
 exports.getOrder = async (req, res) => {
   try {
-    const [orders] = await db.query("SELECT * FROM `Order`"); // ✅ ใส่ Backtick (`) ป้องกัน Error
+    const [orders] = await db.query("SELECT * FROM `Order`"); 
     res.status(200).json(orders);
   } catch (error) {
     console.error("🚨 ดึงข้อมูลคำสั่งซื้อไม่สำเร็จ:", error);
@@ -82,7 +82,7 @@ exports.deleteOrder = async (req, res) => {
     }
   };
 
-  // ✅ ตรวจสอบวัตถุดิบก่อนบันทึก Order
+  //  ตรวจสอบวัตถุดิบก่อนบันทึก Order
   exports.checkIngredientsAvailability = async (orderItems) => {
     let insufficientIngredients = [];
 
@@ -98,18 +98,18 @@ exports.deleteOrder = async (req, res) => {
 
         let ingredients = [];
 
-        // ✅ ตรวจสอบว่า Ingredients เป็น JSON String หรือ Object
+        //  ตรวจสอบว่า Ingredients เป็น JSON String หรือ Object
         if (typeof product[0].Ingredients === "string") {
             try {
-                ingredients = JSON.parse(product[0].Ingredients); // ✅ แปลงเป็น JSON ถ้าเป็น String
+                ingredients = JSON.parse(product[0].Ingredients); //  แปลงเป็น JSON ถ้าเป็น String
             } catch (error) {
                 console.error("🚨 JSON Parse Error (Ingredients):", error);
                 return { success: false, message: "❌ ข้อมูล Ingredients ไม่ถูกต้อง" };
             }
         } else if (typeof product[0].Ingredients === "object" && product[0].Ingredients !== null) {
-            ingredients = product[0].Ingredients; // ✅ ถ้าเป็น Object แล้ว ใช้ได้เลย
+            ingredients = product[0].Ingredients; //  ถ้าเป็น Object แล้ว ใช้ได้เลย
         } else {
-            ingredients = []; // ✅ ถ้าไม่มีข้อมูล ให้เป็น Array ว่าง
+            ingredients = []; //  ถ้าไม่มีข้อมูล ให้เป็น Array ว่าง
         }
 
         for (let ing of ingredients) {
@@ -143,7 +143,7 @@ exports.deleteOrder = async (req, res) => {
 };
 
 
-// ✅ หักวัตถุดิบออกจาก Stock เมื่อคำสั่งซื้อได้รับการยืนยัน
+//  หักวัตถุดิบออกจาก Stock เมื่อคำสั่งซื้อได้รับการยืนยัน
 exports.deductIngredientsFromStock = async (orderItems) => {
   for (let item of orderItems) {
       const [product] = await db.query(
@@ -195,7 +195,7 @@ exports.deductIngredientsFromStock = async (orderItems) => {
               console.error(`❌ วัตถุดิบ ${ing.name} ไม่เพียงพอ ต้องการ ${quantityNeeded} เพิ่ม`);
           }
 
-          // ✅ อัปเดต Quantity ใน Ingredient ให้ตรงกับผลรวมของ Ingredient_Item
+          //  อัปเดต Quantity ใน Ingredient ให้ตรงกับผลรวมของ Ingredient_Item
           await db.query(
               "UPDATE Ingredient SET Quantity = (SELECT COALESCE(SUM(Quantity), 0) FROM Ingredient_Item WHERE Ingredient_ID = ?) WHERE Ingredient_ID = ?",
               [ingredientId, ingredientId]

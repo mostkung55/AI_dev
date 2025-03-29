@@ -30,8 +30,8 @@ const ManageProduct = () => {
                 axios.get("http://localhost:3000/api/ingredient")
             ]);
 
-            setData(productRes.data);  // ✅ ตั้งค่า Product
-            setIngredients(ingredientRes.data);  // ✅ ตั้งค่าวัตถุดิบ
+            setData(productRes.data);  //  ตั้งค่า Product
+            setIngredients(ingredientRes.data);  //  ตั้งค่าวัตถุดิบ
         } catch (error) {
             console.error("🚨 โหลดข้อมูลล้มเหลว:", error);
         }
@@ -95,7 +95,7 @@ const ManageProduct = () => {
   formData.append("description", Description);
   formData.append("price", Price);
   formData.append("Product_image", Product_image);
-  formData.append("ingredients", JSON.stringify(selectedIngredients)); // ✅ ส่ง JSON ของวัตถุดิบ
+  formData.append("ingredients", JSON.stringify(selectedIngredients)); //  ส่ง JSON ของวัตถุดิบ
 
   try {
       await axios.post("http://localhost:3000/api/products", formData, {
@@ -104,7 +104,7 @@ const ManageProduct = () => {
 
       showPopup(" เพิ่มสินค้าสำเร็จ!", "success"); 
       loadData();
-      setSelectedIngredients([]); // ✅ รีเซ็ตวัตถุดิบที่เลือก
+      setSelectedIngredients([]); //  รีเซ็ตวัตถุดิบที่เลือก
       setOpen(false);
   } catch (error) {
       showPopup(" เพิ่มสินค้าไม่สำเร็จ!", "error");  
@@ -121,7 +121,7 @@ const handleEditProduct = async () => {
   formData.append("name", Product_Name);
   formData.append("description", Description);
   formData.append("price", Price);
-  formData.append("ingredients", JSON.stringify(selectedIngredients)); // ✅ ส่งข้อมูลวัตถุดิบที่แก้ไข
+  formData.append("ingredients", JSON.stringify(selectedIngredients)); //  ส่งข้อมูลวัตถุดิบที่แก้ไข
 
   if (Product_image instanceof File) {
       formData.append("Product_image", Product_image);
@@ -161,7 +161,7 @@ const handleEdit = async (product) => {
   setImage(product.Product_image);
   setEditId(product.Product_ID);
 
-  // ✅ โหลดรายการวัตถุดิบทั้งหมด (ป้องกันกรณีที่ Add Product โหลดวัตถุดิบ แต่ Edit ไม่โหลด)
+  //  โหลดรายการวัตถุดิบทั้งหมด (ป้องกันกรณีที่ Add Product โหลดวัตถุดิบ แต่ Edit ไม่โหลด)
   try {
       const res = await axios.get("http://localhost:3000/api/ingredient");
       setIngredients(res.data);
@@ -169,7 +169,7 @@ const handleEdit = async (product) => {
       console.error("🚨 โหลดวัตถุดิบล้มเหลว:", error);
   }
 
-  // ✅ ตรวจสอบว่า Ingredients ของสินค้ามีค่าหรือไม่
+  //  ตรวจสอบว่า Ingredients ของสินค้ามีค่าหรือไม่
   let parsedIngredients = [];
   if (typeof product.Ingredients === "string") {
       try {
@@ -181,7 +181,7 @@ const handleEdit = async (product) => {
       parsedIngredients = product.Ingredients;
   }
 
-  setSelectedIngredients(parsedIngredients); // ✅ ตั้งค่าวัตถุดิบที่ใช้ของสินค้า
+  setSelectedIngredients(parsedIngredients); //  ตั้งค่าวัตถุดิบที่ใช้ของสินค้า
   setOpenEdit(true);
 };
 
@@ -373,7 +373,7 @@ const handleSendToLine = async () => {
           </Button>
         </Box>
       </Modal>
-      {/* ✏️ Modal แก้ไขสินค้า */}
+      {/*  Modal แก้ไขสินค้า */}
         <Modal open={openEdit} onClose={() => setOpenEdit(false)}>
           <Box className="modal-box">
             <Typography variant="h6" gutterBottom> Edit Product </Typography>
@@ -384,7 +384,7 @@ const handleSendToLine = async () => {
             <TextField label="Price" type="number" value={Price} onChange={(e) => setPrice(e.target.value)} fullWidth margin="normal" size="small"/>
             <Typography variant="h6">เลือกวัตถุดิบที่ใช้</Typography>
 
-                      {/* ✅ แสดงรายการวัตถุดิบทั้งหมด */}
+                      {/*  แสดงรายการวัตถุดิบทั้งหมด */}
                       <Box display="flex" flexWrap="wrap" gap={1}>
                           {ingredients.map(ingre => (
                               <Button 
@@ -397,7 +397,7 @@ const handleSendToLine = async () => {
                           ))}
                       </Box>
 
-                      {/* ✅ แสดงวัตถุดิบที่ถูกเลือกไว้ */}
+                      {/*  แสดงวัตถุดิบที่ถูกเลือกไว้ */}
                       <Typography variant="h6" sx={{ mt: 2 }}>วัตถุดิบที่ใช้</Typography>
                       {selectedIngredients.length > 0 ? (
                           selectedIngredients.map((ing, index) => (
@@ -419,7 +419,7 @@ const handleSendToLine = async () => {
             <Button variant="contained" color="secondary" onClick={handleEditProduct} fullWidth> Save Changes </Button>
           </Box>
         </Modal>
-                {/* ✅ Popup Modal ที่แสดงกลางจอ */}
+                {/*  Popup Modal ที่แสดงกลางจอ */}
           <Modal open={openPopup} onClose={() => setOpenPopup(false)}>
             <Box
               sx={{
