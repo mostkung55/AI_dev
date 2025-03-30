@@ -393,9 +393,15 @@ const verifySlip = async (imageId, orderId, customerId) => {
 
     try {
         const imagePath = await downloadImage(imageId);
+        
         if (!imagePath) {
             return "❌ ไม่สามารถดาวน์โหลดรูปภาพได้ กรุณาส่งใหม่";
         }
+        const slipPath = `tmp/slip-${imageId}.jpg`;
+            await db.query(
+                "UPDATE Payment SET Slip = ? WHERE Order_ID = ?",
+                [slipPath, orderId]
+            );
 
         // ✅ ดึงยอดเงินจากฐานข้อมูล
         const [order] = await db.query(

@@ -30,7 +30,7 @@ sys.stdout.reconfigure(encoding='utf-8')
 
 def get_products_from_db():
     connection = pymysql.connect(
-        host="localhost",
+        host="db",
         user="root",
         password="root",
         database="test",
