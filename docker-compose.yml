@@ -11,6 +11,11 @@ services:
       - "3306:3306"
     volumes:
       - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
     
   node-frontend:
     container_name: frontend
@@ -22,6 +27,9 @@ services:
     build: ./line-oa-backend
     ports:
         - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
   ngrok:
     image: ngrok/ngrok:latest
     restart: unless-stopped
