@@ -42,8 +42,28 @@ exports.uploadReceiptSlip = async (req, res) => {
             const { date, detail } = data;
             const insertResults = [];
 
+            //  อัตราคูณจากน้ำหนัก → จำนวนชิ้น
+            const weightToPieceMap = {
+                "ขนมปัง" : 15,
+                "ไก่": 12,
+                "กุ้ง": 30,
+                "ปูอัด": 20,
+                "เบค่อน": 15,
+                "แฮม": 20,
+                "ไข่" : 20,
+                "ชีส" : 10,
+                "ผัก" : 10,
+
+            };
+
             for (const item of detail) {
                 const { name, quantity, price } = item;
+
+                // แปลงหน่วยถ้าจำเป็น
+                let finalQuantity = Number(quantity);
+                if (weightToPieceMap[name]) {
+                    finalQuantity = Number(quantity) * weightToPieceMap[name];
+                }
 
                 // ✅ ค้นหาวัตถุดิบ
                 const [existingIngredient] = await db.query(
@@ -54,7 +74,7 @@ exports.uploadReceiptSlip = async (req, res) => {
                 let ingredientId;
                 if (existingIngredient.length > 0) {
                     ingredientId = existingIngredient[0].Ingredient_ID;
-                    const newTotalQuantity = Number(existingIngredient[0].Quantity) + Number(quantity);
+                    const newTotalQuantity = Number(existingIngredient[0].Quantity) + finalQuantity;
 
                     await db.query(
                         "UPDATE Ingredient SET Quantity = ? WHERE Ingredient_ID = ?",
@@ -65,7 +85,7 @@ exports.uploadReceiptSlip = async (req, res) => {
                         INSERT INTO Ingredient (Ingredient_Name, Quantity, Low_stock_threshold)
                         VALUES (?, ?, ?)
                     `;
-                    const [result] = await db.query(insertIngredientSql, [name, quantity, 1]);
+                    const [result] = await db.query(insertIngredientSql, [name, finalQuantity, 1]);
                     ingredientId = result.insertId;
                 }
 
@@ -75,9 +95,9 @@ exports.uploadReceiptSlip = async (req, res) => {
                     INSERT INTO Ingredient_Item (Ingredient_ID, Batch_code, Quantity, Price, Updated_at)
                     VALUES (?, ?, ?, ?, NOW())
                 `;
-                await db.query(insertItemSql, [ingredientId, batchCode, quantity, price, date]);
+                await db.query(insertItemSql, [ingredientId, batchCode, finalQuantity, price, date]);
 
-                insertResults.push({ name, quantity, price, ingredientId });
+                insertResults.push({ name, quantity: finalQuantity, price, ingredientId });
             }
 
             return res.status(201).json({
@@ -92,6 +112,7 @@ exports.uploadReceiptSlip = async (req, res) => {
         }
     });
 };
+
 
 
 

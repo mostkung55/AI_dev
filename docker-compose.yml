@@ -5,8 +5,8 @@ services:
     image: mysql:latest
     container_name: db
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: test
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
     ports:
       - "3306:3306"
     volumes:
@@ -27,30 +27,32 @@ services:
     build: ./line-oa-backend
     ports:
         - "3000:3000"
+    env_file:
+        - .env    
     depends_on:
       db:
         condition: service_healthy
-  ngrok:
-    image: ngrok/ngrok:latest
-    restart: unless-stopped
-    command: ["http", "host.docker.internal:3000"]
-    ports:
-      - 4040:4040
-    environment:
-      - NGROK_AUTHTOKEN=2sveDX0rDEUkNzxkbsUCz32yYdX_4LEFGYFBKHun4hWt9szKj
-    depends_on:
-      - node-backend
+
+  # ngrok:
+  #   image: ngrok/ngrok:latest
+  #   restart: unless-stopped
+  #   command: ["http", "host.docker.internal:3000"]
+  #   ports:
+  #     - 4040:4040
+  #   environment:
+  #     - NGROK_AUTHTOKEN=2sveDX0rDEUkNzxkbsUCz32yYdX_4LEFGYFBKHun4hWt9szKj
+  #   depends_on:
+  #     - node-backend
             
     
-
   phpmyadmin:
     image: phpmyadmin/phpmyadmin:latest
     container_name: phpmyadmin
     environment:
       PMA_HOST: db
       PMA_PORT: 3306
-      PMA_USER: root
-      PMA_PASSWORD: root
+      PMA_USER: ${PMA_USER}
+      PMA_PASSWORD: ${PMA_PASSWORD}
     ports:
       - "8080:80"
     depends_on:

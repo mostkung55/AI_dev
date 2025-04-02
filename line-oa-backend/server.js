@@ -7,7 +7,7 @@ const axios = require("axios");
 const app = express();
 const cors = require('cors')
 const cron = require("node-cron");
-const { sendProductsToLine } = require("./controllers/manage_Product");
+const { sendProductsToLine, generateProductMenu } = require("./controllers/manage_Product");
 const route_order = require('./routes/route_order');
 const route_orderitem = require('./routes/route_orderitems');
 const route_ingredientitems = require('./routes/route_ingredientitems');
@@ -24,7 +24,28 @@ const EventEmitter = require('events');
 EventEmitter.defaultMaxListeners = 20; // เพิ่ม Limit ของ EventEmitter
 
 
+const swaggerUi = require('swagger-ui-express');
+const swaggerJsdoc = require('swagger-jsdoc');
+//Swagger Definition
+const swaggerOptions = {
+    definition: {
+        openapi: "3.0.0",
+        info: {
+            title: "API doc",
+            version: "1.0.0",
+            description: "A simple API doc",
+        },
+        servers: [
+            {
+                url: "http://localhost:3000",
+            },
+        ],
+    },
+    apis: ["./routes/*.js"], 
+};
 
+const swaggerSpec = swaggerJsdoc(swaggerOptions);
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -80,164 +101,201 @@ async function getUserProfile(userId) {
     }
 }
 
-
+const userState = new Map(); // ใช้เก็บสถานะลูกค้า
 app.post("/webhook", async (req, res) => {
     const events = req.body.events;
 
     for (let event of events) {
         if (event.type === "message" && event.message.type === "text") {
             let customerId = event.source.userId;
-            let customerText = event.message.text;
+            let customerText = event.message.text.trim();
             let customerName = "ลูกค้า";
 
             try {
-                //  ตรวจสอบว่าลูกค้ากำลังพิมพ์ที่อยู่หรือไม่
-                const [waitingOrder] = await db.query(
-                    "SELECT Order_ID FROM `Order` WHERE Customer_ID = ? AND Status = 'Awaiting Address'",
-                    [customerId]
-                );
+                    const lowerText = customerText.toLowerCase();
+                    if (["เมนู", "menu"].some(word => lowerText.includes(word))) {
 
-                if (waitingOrder.length > 0) {
-                    let orderId = waitingOrder[0].Order_ID;
+                    const flexMessage = await generateProductMenu();
+                    if (flexMessage) {
+                        return await client.replyMessage(event.replyToken, flexMessage);
+                    } else {
+                        return await client.replyMessage(event.replyToken, {
+                            type: "text",
+                            text: "ขออภัย ไม่พบเมนูในขณะนี้ครับ 🍽️"
+                        });
 
-                    //  บันทึกที่อยู่ลงใน Order
-                    await db.query(
-                        "UPDATE `Order` SET Customer_Address = ?, Status = 'Preparing' WHERE Order_ID = ?",
-                        [customerText, orderId]
-                    );
+                    }
+                }
+                //  STEP 1: กำลังรอใส่จำนวน
+                if (userState.has(customerId) && userState.get(customerId).step === "waiting_quantity") {
+                    const { menu } = userState.get(customerId);
+                    const quantity = parseInt(customerText);
+                    if (isNaN(quantity) || quantity <= 0) {
+                        return await client.replyMessage(event.replyToken, {
+                            type: "text",
+                            text: " กรุณาระบุจำนวนเป็นตัวเลข เช่น 1, 2, 3 ..."
+                        });
+                    }
 
-                    //  แจ้งลูกค้าว่าที่อยู่ถูกบันทึกแล้ว
-                    await client.replyMessage(event.replyToken, {
-                        type: "text",
-                        text: `✅ ที่อยู่ของคุณถูกบันทึกเรียบร้อยแล้ว!\n📍 ที่อยู่: ${customerText}\n🛵 กำลังเตรียมคำสั่งซื้อของคุณ`
+                    // ส่งเมนู + จำนวน เข้า Python Model
+                    const modelPath = path.join(__dirname, ".", "model", "model.py");
+
+                    const fullText = `${menu} ${quantity}`;
+                    exec(`python "${modelPath}" "${fullText}"`, async (error, stdout) => {
+
+                        if (error) {
+                            console.error("❌ Error running model:", error);
+                            return;
+                        }
+
+                        let orders;
+                        try {
+                            orders = JSON.parse(stdout);
+                        } catch (parseError) {
+                            console.error("❌ JSON Parse Error:", parseError);
+                            await client.replyMessage(event.replyToken, { type: "text", text: "เกิดข้อผิดพลาด กรุณาลองใหม่" });
+                            return;
+                        }
+
+                        if (!Array.isArray(orders) || orders.length === 0) {
+                            return await client.replyMessage(event.replyToken, {
+                                type: "text",
+                                text: "❌ ไม่พบสินค้าที่ตรงกับคำสั่งของคุณ กรุณาตรวจสอบชื่อเมนูหรือพิมพ์ว่า 'เมนู' เพื่อดูรายการครับ"
+                            });
+                        }
+
+
+                        let totalAmount = 0;
+                        let orderItems = [];
+
+                        for (let order of orders) {
+                            const [rows] = await db.query(
+                                "SELECT Price FROM Product WHERE Product_ID = ?",
+                                [order.Product_ID]
+                            );
+                            if (!rows.length) continue;
+
+                            let price = parseFloat(rows[0].Price);
+                            let subtotal = price * order.quantity;
+                            totalAmount += subtotal;
+
+                            orderItems.push({
+                                product_id: order.Product_ID,
+                                menu: order.menu,
+                                quantity: order.quantity,
+                                subtotal: subtotal
+                            });
+                        }
+
+                        //  สร้าง Flex Message ให้ลูกค้ายืนยัน
+                        const confirmMessage = {
+                            type: "flex",
+                            altText: "กรุณายืนยันคำสั่งซื้อ",
+                            contents: {
+                                type: "bubble",
+                                body: {
+                                    type: "box",
+                                    layout: "vertical",
+                                    contents: [
+                                        { type: "text", text: "ยืนยันคำสั่งซื้อ", weight: "bold", size: "xl" },
+                                        ...orderItems.map(order => ({
+                                            type: "text",
+                                            text: `- ${order.menu} x ${order.quantity} ชิ้น (${order.subtotal} บาท)`,
+                                            wrap: true
+                                        })),
+                                        { type: "text", text: `💰 ยอดรวม: ${totalAmount} บาท`, weight: "bold", margin: "md" }
+                                    ]
+                                },
+                                footer: {
+                                    type: "box",
+                                    layout: "horizontal",
+                                    spacing: "sm",
+                                    contents: [
+                                        {
+                                            type: "button",
+                                            style: "primary",
+                                            color: "#1DB446",
+                                            action: {
+                                                type: "postback",
+                                                label: "Confirm",
+                                                data: JSON.stringify({ action: "confirm_order", customerId, orderItems, totalAmount })
+                                            }
+                                        },
+                                        {
+                                            type: "button",
+                                            style: "secondary",
+                                            color: "#AAAAAA",
+                                            action: {
+                                                type: "postback",
+                                                label: "Cancel",
+                                                data: JSON.stringify({ action: "cancel_order", customerId })
+                                            }
+                                        }
+                                    ]
+                                }
+                            }
+                        };
+
+                        await client.replyMessage(event.replyToken, confirmMessage);
+                        userState.delete(customerId);
                     });
 
                     return;
                 }
 
-                //  ดึงข้อมูลโปรไฟล์ลูกค้า
-                const profile = await getUserProfile(customerId);
-                if (profile) {
-                    customerName = profile.displayName;
+                //  STEP 2: ตรวจสอบว่าข้อความเป็นชื่อเมนูที่มีอยู่หรือไม่
+                const [product] = await db.query("SELECT * FROM Product WHERE Product_Name = ?", [customerText]);
+                if (product.length > 0) {
+                    userState.set(customerId, { step: "waiting_quantity", menu: customerText });
+                    return await client.replyMessage(event.replyToken, {
+                        type: "text",
+                        text: `🍞 คุณเลือก: ${customerText}\nกรุณาระบุจำนวนที่ต้องการ (เช่น: 2)`
+                    });
                 }
 
-                //  บันทึกลูกค้า (ถ้ายังไม่มี)
+                //  STEP 3: เช็คว่าเป็นการกรอกที่อยู่
+                const [waitingOrder] = await db.query(
+                    "SELECT Order_ID FROM `Order` WHERE Customer_ID = ? AND Status = 'Awaiting Address'",
+                    [customerId]
+                );
+                if (waitingOrder.length > 0) {
+                    let orderId = waitingOrder[0].Order_ID;
+                    await db.query(
+                        "UPDATE `Order` SET Customer_Address = ?, Status = 'Preparing' WHERE Order_ID = ?",
+                        [customerText, orderId]
+                    );
+
+                    return await client.replyMessage(event.replyToken, {
+                        type: "text",
+                        text: `✅ ที่อยู่ของคุณถูกบันทึกเรียบร้อยแล้ว!\n📍 ที่อยู่: ${customerText}\n🛵 กำลังเตรียมคำสั่งซื้อของคุณ`
+                    });
+                }
+
+                //  STEP 4: บันทึกลูกค้า (ถ้ายังไม่มี)
+                const profile = await getUserProfile(customerId);
+                if (profile) customerName = profile.displayName;
+
                 await db.query(
                     `INSERT INTO Customer (Customer_ID, Customer_Name) VALUES (?, ?) 
                      ON DUPLICATE KEY UPDATE Customer_Name = VALUES(Customer_Name)`,
                     [customerId, customerName]
                 );
+                
 
-                //  เรียกโมเดล Python
-                const modelPath = path.join(__dirname, ".", "model", "model.py");
-                exec(`python "${modelPath}" "${customerText}"`, async (error, stdout) => {
-                    if (error) {
-                        console.error("❌ Error running model:", error);
-                        return;
-                    }
-
-                    let orders;
-                    try {
-                        orders = JSON.parse(stdout);
-                    } catch (parseError) {
-                        console.error("❌ JSON Parse Error:", parseError);
-                        await client.replyMessage(event.replyToken, { type: "text", text: "เกิดข้อผิดพลาด กรุณาลองใหม่" });
-                        return;
-                    }
-
-                    if (!Array.isArray(orders) || orders.length === 0) {
-                        await client.replyMessage(event.replyToken, { type: "text", text: "❌ ไม่พบสินค้าที่ตรงกับคำสั่งของคุณ" });
-                        return;
-                    }
-
-                    let totalAmount = 0;
-                    let orderItems = [];
-
-                    for (let order of orders) {
-                        const [rows] = await db.query(
-                            "SELECT Price FROM Product WHERE Product_ID = ?",
-                            [order.Product_ID]
-                        );
-                        if (!rows.length) continue;
-
-                        let price = parseFloat(rows[0].Price);
-                        let subtotal = price * order.quantity;
-                        totalAmount += subtotal;
-
-                        orderItems.push({
-                            product_id: order.Product_ID,
-                            menu: order.menu,
-                            quantity: order.quantity,
-                            subtotal: subtotal
-                        });
-                    }
-
-                    //  สร้าง Flex Message ให้ลูกค้ายืนยัน (แต่ยังไม่บันทึกลง Database)
-                    const confirmMessage = {
-                        type: "flex",
-                        altText: "กรุณายืนยันคำสั่งซื้อ",
-                        contents: {
-                            type: "bubble",
-                            body: {
-                                type: "box",
-                                layout: "vertical",
-                                contents: [
-                                    { type: "text", text: "ยืนยันคำสั่งซื้อ", weight: "bold", size: "xl" },
-                                    ...orderItems.map(order => ({
-                                        type: "text",
-                                        text: `- ${order.menu} x ${order.quantity} ชิ้น (${order.subtotal} บาท)`,
-                                        wrap: true
-                                    })),
-                                    { type: "text", text: `💰 ยอดรวม: ${totalAmount} บาท`, weight: "bold", margin: "md" }
-                                ]
-                            },
-                            footer: {
-                                type: "box",
-                                layout: "horizontal",
-                                spacing: "sm",
-                                contents: [
-                                    {
-                                        type: "button",
-                                        style: "primary",
-                                        color: "#1DB446",
-                                        action: {
-                                            type: "postback",
-                                            label: "Confirm",
-                                            data: JSON.stringify({ action: "confirm_order", customerId, orderItems, totalAmount })
-                                        }
-                                    },
-                                    {
-                                        type: "button",
-                                        style: "secondary",
-                                        color: "#AAAAAA",
-                                        action: {
-                                            type: "postback",
-                                            label: "Cancel",
-                                            data: JSON.stringify({ action: "cancel_order", customerId })
-                                        }
-                                    }
-                                ]
-                            }
-                        }
-                    };
-
-                    //  ส่ง Flex Message ให้ลูกค้ากดยืนยัน
-                    await client.replyMessage(event.replyToken, confirmMessage);
+                await client.replyMessage(event.replyToken, {
+                    type: "text",
+                    text: "🙏 สวัสดีครับ ต้องการสั่งเมนูอะไรแจ้งได้เลย หรือพิมพ์ว่า 'เมนู' เพื่อดูรายการครับ"
                 });
 
             } catch (error) {
-                console.error("🚨 Error processing order:", error);
+                console.error("🚨 Error processing text message:", error);
             }
         }
+
+        //  STEP 5: ดักจับรูปภาพ (ส่งสลิป)
         else if (event.type === 'message' && event.message.type === "image") {
             const imageId = event.message.id;
-
-            // console.log("🖼️ Image ID ที่ส่งไปโหลด:", imageId);
-            if (!imageId) {
-                console.error("❌ Image ID เป็นค่าว่าง! ตรวจสอบการดึงค่าจาก LINE API");
-                return;
-            }
-
+            if (!imageId) return;
 
             const [latestOrder] = await db.query(
                 "SELECT Order_ID FROM `Order` WHERE Customer_ID = ? ORDER BY Order_ID DESC LIMIT 1",
@@ -249,16 +307,12 @@ app.post("/webhook", async (req, res) => {
             }
 
             const orderId = latestOrder[0].Order_ID;
-
             const resultMessage = await verifySlip(imageId, orderId, event.source.userId);
 
-            await client.replyMessage(event.replyToken, {
-                type: "text",
-                text: resultMessage
-            });
+            await client.replyMessage(event.replyToken, { type: "text", text: resultMessage });
         }
 
-        //  ตรวจจับเมื่อมีการกดปุ่ม Confirm หรือ Cancel
+        //  STEP 6: postback (ยืนยัน / ยกเลิก / ชำระเงิน)
         else if (event.type === "postback") {
             let data;
             try {
@@ -268,27 +322,22 @@ app.post("/webhook", async (req, res) => {
                 return;
             }
 
-
             if (data.action === "confirm_order") {
                 try {
-                    //  ตรวจสอบวัตถุดิบก่อน
                     const ingredientCheck = await checkIngredientsAvailability(data.orderItems);
                     if (!ingredientCheck.success) {
-                        await client.replyMessage(event.replyToken, {
+                        return await client.replyMessage(event.replyToken, {
                             type: "text",
                             text: ingredientCheck.message
                         });
-                        return;
                     }
 
-                    // บันทึก Order ลงฐานข้อมูล
                     const [orderResult] = await db.query(
                         "INSERT INTO `Order` (Customer_ID, Total_Amount, Customer_Address, Status) VALUES (?, ?, NULL, 'Awaiting Address')",
                         [data.customerId, data.totalAmount]
                     );
                     const orderId = orderResult.insertId;
 
-                    //  บันทึก Order Items
                     for (let item of data.orderItems) {
                         await db.query(
                             "INSERT INTO Order_Item (Order_ID, Product_ID, Quantity, Subtotal, Status) VALUES (?, ?, ?, ?, 'Preparing')",
@@ -296,10 +345,8 @@ app.post("/webhook", async (req, res) => {
                         );
                     }
 
-                    //  หักสต็อกวัตถุดิบ
                     await deductIngredientsFromStock(data.orderItems);
 
-                    //  แจ้งลูกค้าให้ส่งที่อยู่
                     await client.replyMessage(event.replyToken, {
                         type: "text",
                         text: "✅ คำสั่งซื้อของคุณได้รับการยืนยันแล้ว!\n📍 กรุณาส่งที่อยู่สำหรับจัดส่งสินค้าของคุณ"
@@ -311,17 +358,16 @@ app.post("/webhook", async (req, res) => {
                 }
             }
             else if (data.action === "cancel_order") {
-                //  ส่งข้อความใหม่แทนปุ่ม
                 await client.replyMessage(event.replyToken, {
                     type: "text",
                     text: "❌ คำสั่งซื้อของคุณถูกยกเลิกเรียบร้อยแล้ว"
                 });
-            } else if (data.action === "payment") {
-                let paymentText = data.method === "cash" ? "💵 เงินสด" : "💳 โอนเงิน";
-
+            }
+            else if (data.action === "payment") {
+                const paymentText = data.method === "cash" ? "💵 เงินสด" : "💳 โอนเงิน";
                 const [order] = await db.query("SELECT Total_Amount FROM `Order` WHERE Order_ID = ?", [data.orderId]);
-
                 const amount = order[0].Total_Amount;
+
                 await db.query(
                     "INSERT INTO `Payment` (Order_ID, Amount, Method, Payment_Date, Status) VALUES (?, ?, ?, NOW(), 'Pending') " +
                     "ON DUPLICATE KEY UPDATE Method = VALUES(Method), Status = 'Pending'",
@@ -340,21 +386,13 @@ app.post("/webhook", async (req, res) => {
                         type: "text",
                         text: accountDetails
                     });
-
-                } else if (data.method === "cash") {
-                    await client.replyMessage(event.replyToken, {
-                        type: "text",
-                        text: `💰 ยอดที่ต้องชำระ: ${amount} บาท\n\n📌 โปรดเตรียมเงินให้พร้อม`
-                    });
-
                 } else {
                     await client.replyMessage(event.replyToken, {
                         type: "text",
-                        text: `✅ คุณเลือกชำระเงินด้วย: ${paymentText}`
+                        text: `💰 ยอดที่ต้องชำระ: ${amount} บาท\n📌 คุณเลือกชำระเงินด้วย: ${paymentText}`
                     });
                 }
             }
-
         }
     }
 
@@ -426,8 +464,8 @@ const verifySlip = async (imageId, orderId, customerId) => {
         formData.append("log", "true");
         formData.append("amount", expectedAmount);
 
-        const SLIPOK_BRANCH_ID = "40472";
-        const SLIPOK_API_KEY = "SLIPOK40XQRAA";
+        const SLIPOK_BRANCH_ID = process.env.SLIPOK_BRANCH_ID;
+        const SLIPOK_API_KEY = process.env.SLIPOK_API_KEY;
 
         const response = await axios.post(
             `https://api.slipok.com/api/line/apikey/${SLIPOK_BRANCH_ID}`,

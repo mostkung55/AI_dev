@@ -162,10 +162,9 @@ exports.generateProductMenu = async () => {
         const [products] = await db.query("SELECT Product_Name, Price, Description, Product_image FROM Product LIMIT 6");
 
         if (products.length === 0) {
-            return null; //  ถ้าไม่มีสินค้าให้คืนค่า `null`
+            return null;
         }
 
-        //  สร้าง Flex Message
         const flexMessage = {
             type: "flex",
             altText: "เมนูสินค้าใหม่วันนี้",
@@ -175,10 +174,15 @@ exports.generateProductMenu = async () => {
                     type: "bubble",
                     hero: {
                         type: "image",
-                        url: `https://29e9-58-8-94-90.ngrok-free.app${product.Product_image}`,
+                        url: `https://d0b1-58-8-94-90.ngrok-free.app${product.Product_image}`,
                         size: "full",
                         aspectRatio: "20:13",
-                        aspectMode: "cover"
+                        aspectMode: "cover",
+                        action: {
+                            type: "message",
+                            label: "เลือกเมนูนี้",
+                            text: product.Product_Name
+                        }
                     },
                     body: {
                         type: "box",
@@ -188,7 +192,8 @@ exports.generateProductMenu = async () => {
                                 type: "text",
                                 text: product.Product_Name,
                                 weight: "bold",
-                                size: "xl"
+                                size: "xl",
+                                wrap: true
                             },
                             {
                                 type: "text",
@@ -204,6 +209,23 @@ exports.generateProductMenu = async () => {
                                 color: "#666666"
                             }
                         ]
+                    },
+                    footer: {
+                        type: "box",
+                        layout: "vertical",
+                        spacing: "sm",
+                        contents: [
+                            {
+                                type: "button",
+                                style: "primary",
+                                color: "#00B900",
+                                action: {
+                                    type: "message",
+                                    label: "เลือกเมนูนี้",
+                                    text: product.Product_Name
+                                }
+                            }
+                        ]
                     }
                 }))
             }
@@ -215,6 +237,7 @@ exports.generateProductMenu = async () => {
         return null;
     }
 };
+
 
 exports.sendProductsToLine = async (req, res = null) => {
     try {
