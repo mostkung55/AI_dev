@@ -8,3 +8,6 @@ protobuf
 tiktoken
 sentencepiece
 python-Levenshtein
+python-dotenv
+Pillow          
+google-generativeai

@@ -10,15 +10,17 @@ from pythainlp.tokenize import word_tokenize
 from fuzzywuzzy import fuzz, process
 import sys
 import json
+from dotenv import load_dotenv
+load_dotenv()
 sys.stdout.reconfigure(encoding='utf-8')
 
 def get_products_from_db():
     connection = pymysql.connect(
-        host="db",
-        user="root",
-        password="root",
-        database="test",
-        port=3306,
+        host=os.environ.get("DB_HOST"),
+        user=os.environ.get("DB_USER"),
+        password=os.environ.get("DB_PASSWORD"),
+        database=os.environ.get("DB_NAME"),
+        port=int(os.environ.get("DB_PORT")),
         cursorclass=pymysql.cursors.DictCursor
     )
     

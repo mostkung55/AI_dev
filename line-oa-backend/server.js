@@ -126,43 +126,48 @@ app.post("/webhook", async (req, res) => {
 
                     }
                 }
-                //  STEP 1: กำลังรอใส่จำนวน
-                if (userState.has(customerId) && userState.get(customerId).step === "waiting_quantity") {
-                    const { menu } = userState.get(customerId);
-                    const quantity = parseInt(customerText);
-                    if (isNaN(quantity) || quantity <= 0) {
-                        return await client.replyMessage(event.replyToken, {
-                            type: "text",
-                            text: " กรุณาระบุจำนวนเป็นตัวเลข เช่น 1, 2, 3 ..."
-                        });
-                    }
+                if (userState.has(customerId)) {
+                    const state = userState.get(customerId);
 
-                    // ส่งเมนู + จำนวน เข้า Python Model
-                    const modelPath = path.join(__dirname, ".", "model", "model.py");
-
-                    const fullText = `${menu} ${quantity}`;
-                    exec(`python "${modelPath}" "${fullText}"`, async (error, stdout) => {
-
-                        if (error) {
-                            console.error("❌ Error running model:", error);
-                            return;
-                        }
-
-                        let orders;
-                        try {
-                            orders = JSON.parse(stdout);
-                        } catch (parseError) {
-                            console.error("❌ JSON Parse Error:", parseError);
-                            await client.replyMessage(event.replyToken, { type: "text", text: "เกิดข้อผิดพลาด กรุณาลองใหม่" });
-                            return;
-                        }
-
-                        if (!Array.isArray(orders) || orders.length === 0) {
+                    if (state.step === "waiting_quantity_multi") {
+                        const quantity = parseInt(customerText);
+                        if (isNaN(quantity) || quantity <= 0) {
                             return await client.replyMessage(event.replyToken, {
                                 type: "text",
-                                text: "❌ ไม่พบสินค้าที่ตรงกับคำสั่งของคุณ กรุณาตรวจสอบชื่อเมนูหรือพิมพ์ว่า 'เมนู' เพื่อดูรายการครับ"
+                                text: "⚠️ กรุณาระบุจำนวนเป็นตัวเลข เช่น 1, 2, 3 ..."
                             });
                         }
+                        state.menus.push({ menu: state.currentMenu, quantity });
+                        state.step = "waiting_next_menu";
+                        userState.set(customerId, state);
+                        return await client.replyMessage(event.replyToken, {
+                            type: "text",
+                            text: `✅ เพิ่ม: ${state.currentMenu} x ${quantity} แล้ว\n📌 พิมพ์ชื่อเมนูต่อไป หรือพิมพ์ว่า \"ไม่รับ\" ถ้าเสร็จแล้ว`
+                        });
+                    }
+                    if (state.step === "waiting_next_menu") {
+                        if (["พอ", "ไม่", "ไม่รับคับ", "ไม่รับ","ไม่รับแล้วครับ","ไม่รับครับ"].includes(lowerText)) {
+                            const fullText = state.menus.map(m => `${m.menu} ${m.quantity}`).join(" ");
+                            const modelPath = path.join(__dirname, "./model/model.py");
+
+                            exec(`python "${modelPath}" "${fullText}"`, async (error, stdout) => {
+                                if (error) return;
+                                let orders;
+                                try {
+                                    orders = JSON.parse(stdout);
+                                } catch {
+                                    return await client.replyMessage(event.replyToken, {
+                                        type: "text",
+                                        text: "เกิดข้อผิดพลาด กรุณาลองใหม่"
+                                    });
+                                }
+
+                                if (!Array.isArray(orders) || orders.length === 0) {
+                                    return await client.replyMessage(event.replyToken, {
+                                        type: "text",
+                                        text: "❌ ไม่พบสินค้าที่ตรงกับคำสั่งของคุณ"
+                                    });
+                                }
 
 
                         let totalAmount = 0;
@@ -246,12 +251,36 @@ app.post("/webhook", async (req, res) => {
                 //  STEP 2: ตรวจสอบว่าข้อความเป็นชื่อเมนูที่มีอยู่หรือไม่
                 const [product] = await db.query("SELECT * FROM Product WHERE Product_Name = ?", [customerText]);
                 if (product.length > 0) {
-                    userState.set(customerId, { step: "waiting_quantity", menu: customerText });
+                    state.step = "waiting_quantity_multi";
+                    state.currentMenu = customerText;
+                    userState.set(customerId, state);
                     return await client.replyMessage(event.replyToken, {
                         type: "text",
-                        text: `🍞 คุณเลือก: ${customerText}\nกรุณาระบุจำนวนที่ต้องการ (เช่น: 2)`
+                        text: `🍞 คุณเลือก: ${customerText}\nกรุณาระบุจำนวนที่ต้องการ`
                     });
                 }
+                return await client.replyMessage(event.replyToken, {
+                    type: "text",
+                    text: "❌ ไม่พบเมนูนี้ กรุณาพิมพ์ใหม่ หรือพิมพ์ว่า 'พอ' ถ้าเสร็จแล้ว"
+                });
+            }
+        }
+
+        //(เจอเมนูครั้งแรก)
+                    const [product] = await db.query("SELECT * FROM Product WHERE Product_Name = ?", [customerText]);
+                    if (product.length > 0) {
+                        const state = userState.get(customerId) || { menus: [] };
+                        state.step = "waiting_quantity_multi";
+                        state.currentMenu = customerText;
+                        if (!state.menus) state.menus = [];
+                        userState.set(customerId, state);
+
+                        return await client.replyMessage(event.replyToken, {
+                            type: "text",
+                            text: `🍞 คุณเลือก: ${customerText}\nกรุณาระบุจำนวนที่ต้องการ (เช่น: 2)`
+                        });
+                    }
+
 
                 //  STEP 3: เช็คว่าเป็นการกรอกที่อยู่
                 const [waitingOrder] = await db.query(
